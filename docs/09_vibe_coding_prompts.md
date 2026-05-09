@@ -4,10 +4,22 @@
 
 ## 공통 규칙 프롬프트
 ```text
-너는 Flutter 시니어 개발자다. 앱 이름은 말차례다. 이 앱은 두 사람이 체스 시계처럼 말할 시간을 나누는 대화 타이머다.
+너는 Flutter 시니어 개발자다. 앱 이름은 말차례 CalmTurn이다. 이 앱은 두 사람이 체스 시계처럼 말할 시간을 나누되, 전체 발언 시간, 턴당 발언 제한, 오버타임, 패널티, 알림을 함께 관리하는 대화 타이머다.
 
 중요 원칙:
+- MVP는 2인 대화만 지원한다.
+- 각 참여자의 전체 발언 시간은 기본적으로 같지만, 사용자가 합의하면 각자 다르게 설정할 수 있다.
+- 한 번의 차례에는 턴당 발언 제한이 있다.
+- 말하는 사람의 전체 시간과 이번 턴 시간이 동시에 줄어든다.
+- 턴 시간이 0이 되면 기본적으로 자동 전환하지 않고 오버타임 상태로 들어간다.
+- 차례 넘기기를 누르지 않으면 현재 발언자의 오버타임이 계속 증가한다.
+- 오버타임이 기본 1분에 도달하면 패널티 이벤트를 발생시킨다.
+- 패널티 기준은 설정 가능해야 한다.
+- 각자 발언 시간이 10초 남으면 알림 이벤트를 발생시킨다.
+- 알림 시점과 방식은 설정 가능해야 한다.
+- 알림 방식은 화면, 소리, 진동/햅틱을 지원할 수 있게 설계한다.
 - MVP는 로그인, 클라우드, 녹음, AI, 결제 없이 만든다.
+- MVP에서는 누가 실제로 말하는지 음성으로 감지하지 않는다. 버튼 입력 기준으로 차례를 판단한다.
 - 타이머 로직은 UI와 분리한다.
 - 모든 핵심 타이머 로직에는 단위 테스트를 작성한다.
 - iOS 출시를 고려해 접근성과 단순한 UI를 우선한다.
@@ -22,176 +34,336 @@ lib/
   main.dart
   app.dart
   core/
+    theme/
+    utils/
+    constants/
+    time/
   features/
     session_setup/
+      presentation/
+      application/
+      domain/
     timer/
+      presentation/
+      application/
+      domain/
+    feedback/
+      application/
+      domain/
+      data/
     history/
+      presentation/
+      application/
+      domain/
+      data/
     settings/
+      presentation/
+      application/
+      domain/
+      data/
   shared/
+    widgets/
+    models/
 
 test/
   timer/
+  settings/
 
-패키지는 우선 flutter_riverpod, go_router, uuid, intl만 추가해줘. 로컬 저장은 아직 넣지 마.
-앱 첫 화면에는 “말차례” 제목과 “새 대화 시작”, “5분씩 빠른 시작” 버튼만 표시해줘.
+아직 UI를 많이 만들지 말고, 기본 앱이 실행되는 상태와 폴더 구조만 만들어줘.
 ```
 
-## Prompt 1 — 타이머 도메인 모델
+## Prompt 1 — 도메인 모델 만들기
 ```text
-UI를 건드리지 말고 타이머 도메인 모델만 만들어줘.
+말차례 CalmTurn의 도메인 모델을 만들어줘.
 
 필요한 모델:
+- ParticipantConfig
 - Participant
-- ConversationSession
-- TimerState
-- SessionStatus: draft, waitingConsent, running, paused, finished
-- ActiveSpeaker: participantA, participantB, none
+- SessionConfig
+- OvertimeConfig
+- PenaltyConfig
+- AlertConfig
+- TimerSnapshot
+- TimerEvent
+- SessionRecord
+- ParticipantResult
 
-총량 모드만 구현해줘. 각 참가자는 initialTime과 remainingTime을 가져야 해.
+요구사항:
+- 참가자별 전체 발언 시간은 다를 수 있다.
+- 턴당 제한 시간이 있다.
+- 오버타임 설정이 있다.
+- 패널티 기준 시간이 있다. 기본값은 60초다.
+- 알림 기준 시간이 있다. 기본값은 10초다.
+- 알림 방식은 visual, sound, haptic을 bool 값으로 표현한다.
+- 모든 모델은 불변 객체로 만들어줘.
+- copyWith가 필요하면 추가해줘.
+- 아직 UI는 만들지 마.
 ```
 
-## Prompt 2 — 타이머 엔진 구현
+## Prompt 2 — 순수 Dart 타이머 엔진 만들기
 ```text
-TimerEngine 클래스를 만들어줘.
+순수 Dart로 TimerEngine을 만들어줘. Flutter UI나 플랫폼 API에 의존하지 않아야 한다.
 
-필요 메서드:
-- start(activeSpeaker)
-- switchSpeaker()
+필수 기능:
+- start(config)
+- tick(Duration elapsed)
+- passTurn()
 - pause()
 - resume()
 - finish()
-- getCurrentState(now)
+- addTime(participantId, seconds)
+- snapshot()
 
-중요:
-Timer.periodic에 의존해 시간을 깎지 말고, activeStartedAt과 now의 차이로 남은 시간을 계산해줘.
+타이머 규칙:
+- 현재 발언자의 전체 시간과 턴 시간이 동시에 줄어든다.
+- 턴 시간이 0이 되면 Running.Overtime 상태로 간다.
+- 오버타임 중에는 currentTurnOvertimeSeconds가 증가한다.
+- 오버타임 중에도 현재 발언자의 전체 시간이 남아 있으면 전체 시간이 계속 줄어든다.
+- 오버타임이 penaltyThresholdSeconds에 도달하면 PenaltyReachedEvent를 발생시킨다.
+- 기본 반복 모드는 oncePerTurn이다.
+- currentTurnRemainingSeconds가 warningBeforeSeconds에 도달하면 TurnWarningEvent를 한 번 발생시킨다.
+- active.totalRemainingSeconds가 warningBeforeSeconds에 도달하면 TotalWarningEvent를 한 번 발생시킨다.
+- 전체 시간이 0이 되면 NeedsExtension 상태로 간다.
+- 휴식 중에는 시간이 흐르지 않는다.
+
+테스트하기 쉽게 이벤트 리스트를 반환하도록 만들어줘.
 ```
 
-## Prompt 3 — 단위 테스트
+## Prompt 3 — 타이머 엔진 단위 테스트
 ```text
 TimerEngine에 대한 단위 테스트를 작성해줘.
 
 테스트 케이스:
-1. A가 30초 말하면 A의 시간이 30초 줄어든다.
-2. A에서 B로 전환하면 이후 B의 시간이 줄어든다.
-3. pause 상태에서는 시간이 줄어들지 않는다.
-4. resume 이후 시간이 다시 줄어든다.
-5. 시간이 0이 되면 timeExpired 또는 finished 상태로 전환된다.
+1. A 5분, B 10분처럼 전체 시간이 다르게 설정된다.
+2. Normal 상태에서 현재 발언자의 전체 시간과 턴 시간이 줄어든다.
+3. 턴 시간이 10초 남으면 TurnWarningEvent가 한 번 발생한다.
+4. 전체 시간이 10초 남으면 TotalWarningEvent가 한 번 발생한다.
+5. 턴 시간이 0이 되면 Running.Overtime 상태가 된다.
+6. 오버타임이 증가한다.
+7. 오버타임 60초에 패널티가 1회 발생한다.
+8. oncePerTurn 모드에서는 같은 턴에 패널티가 중복 발생하지 않는다.
+9. everyThreshold 모드에서는 60초, 120초마다 패널티가 발생한다.
+10. passTurn을 누르면 상대 차례가 되고 턴 시간이 초기화된다.
+11. pause 상태에서는 시간이 흐르지 않는다.
+12. 전체 시간이 0이 되면 NeedsExtension 상태가 된다.
+
+실패 케이스도 포함해줘.
 ```
 
-## Prompt 4 — 세션 설정 화면
+## Prompt 4 — 세션 설정 화면 만들기
 ```text
-세션 설정 화면을 만들어줘.
+SessionSetupFlow를 만들어줘.
 
-필드:
-- 참가자 A 이름, 기본값 “나”
-- 참가자 B 이름, 기본값 “상대”
-- 시간 프리셋: 각 3분, 5분, 10분, 15분
-- 대화 유형: 부부/연인, 가족, 회의, 토론, 직접 설정
-
-저장 버튼을 누르면 동의 화면으로 이동하게 해줘.
-```
-
-## Prompt 5 — 동의 화면
-```text
-동의 화면을 만들어줘.
-
-표시할 규칙:
-- 말하는 사람의 시간이 줄어듭니다.
-- 말이 끝나면 차례를 넘겨주세요.
-- 누구든 휴식을 누를 수 있습니다.
-- 이 앱은 승패를 정하지 않습니다.
-
-참가자 A 동의 버튼과 참가자 B 동의 버튼이 모두 눌려야 “시작” 버튼이 활성화되게 해줘.
-```
-
-## Prompt 6 — 타이머 화면
-```text
-타이머 화면을 만들어줘.
+화면 요소:
+- 참가자 A 이름
+- 참가자 B 이름
+- 전체 발언 시간 모드: 같은 시간 / 각자 다르게
+- 같은 시간일 때 프리셋: 3분, 5분, 10분, 15분, 직접 입력
+- 각자 다르게일 때 A 시간, B 시간 직접 입력
+- 턴당 제한 프리셋: 30초, 45초, 1분, 1분 30초, 2분, 직접 입력
+- 첫 발언자 선택
+- 다음 버튼
 
 요구사항:
-- 화면을 두 참가자 영역으로 나눠줘.
-- 각 영역에 이름과 남은 시간을 크게 보여줘.
-- 현재 말하는 사람을 시각적으로 강조해줘.
-- “차례 넘기기”, “휴식”, “종료” 버튼을 제공해줘.
-- 시간이 10초 이하가 되면 텍스트로 “곧 시간이 끝나요”를 표시해줘.
+- 입력값을 검증해줘.
+- 각자 다른 전체 시간이면 안내 문구를 보여줘.
+- 아직 타이머 화면과 연결하지 말고 SessionConfig를 만들 수 있게 해줘.
 ```
 
-## Prompt 7 — 휴식 모드
+## Prompt 5 — 오버타임/패널티/알림 설정 화면 만들기
 ```text
-휴식 모드를 구현해줘.
-
-휴식 버튼을 누르면 타이머가 멈추고 다음 문구를 보여줘.
-“잠깐 쉬어도 괜찮아요. 지금은 해결보다 진정이 먼저일 수 있어요.”
-
-재개 버튼을 누르면 원래 발언자부터 다시 시작하게 해줘.
-종료 버튼도 제공해줘.
-```
-
-## Prompt 8 — 종료 회고 화면
-```text
-종료 회고 화면을 만들어줘.
+OvertimePenaltyAlertSettings 화면을 만들어줘.
 
 필드:
-- 오늘 합의한 것
-- 아직 남은 것
-- 다음에 이야기할 것
+- 오버타임 사용 여부
+- 패널티 기준: 15초, 30초, 1분, 2분, 직접 입력
+- 반복 패널티 여부
+- 사전 알림 시점: 5초, 10초, 15초, 30초, 직접 입력
+- 턴 시간 알림 켜기/끄기
+- 전체 시간 알림 켜기/끄기
+- 오버타임 시작 알림 켜기/끄기
+- 패널티 알림 켜기/끄기
+- 화면 표시 켜기/끄기
+- 소리 켜기/끄기
+- 진동/햅틱 켜기/끄기
 
-저장 버튼을 누르면 홈으로 돌아가게 해줘.
-아직 로컬 저장은 구현하지 말고, 콘솔에 결과를 출력해줘.
+기본값:
+- 오버타임 켜짐
+- 패널티 기준 60초
+- 반복 패널티 꺼짐
+- 사전 알림 10초
+- 화면 표시 켜짐
+- 진동/햅틱 켜짐
+- 소리 꺼짐
+
+설정값으로 OvertimeConfig, PenaltyConfig, AlertConfig를 생성해줘.
 ```
 
-## Prompt 9 — 로컬 저장
+## Prompt 6 — Consent 화면 만들기
 ```text
-세션 기록을 로컬에 저장해줘.
+ConsentScreen을 만들어줘.
 
-저장할 데이터:
-- id
-- 날짜
-- 참가자 이름
-- 각자 사용 시간
+표시해야 할 내용:
+- 참가자별 전체 발언 시간
+- 턴당 발언 제한
+- 오버타임 사용 여부
+- 패널티 기준
+- 반복 패널티 여부
+- 10초 전 알림 또는 설정된 알림 시점
+- 알림 방식: 화면/소리/진동
+- 첫 발언자
+
+요구사항:
+- 두 사람이 각각 동의해야 시작 버튼이 활성화된다.
+- 각자 전체 시간이 다르면 더 눈에 띄게 표시해줘.
+- “차례를 넘기지 않으면 오버타임이 기록됩니다” 문구를 넣어줘.
+- “불편하면 언제든 휴식하거나 종료할 수 있습니다” 문구를 넣어줘.
+```
+
+## Prompt 7 — Timer 화면 만들기
+```text
+TimerScreen을 만들어줘.
+
+필수 요소:
+- 참가자 A 카드
+- 참가자 B 카드
+- 각자의 전체 남은 시간
+- 각자의 오버타임 합계
+- 각자의 패널티 횟수
+- 현재 발언자 표시
+- 현재 턴 남은 시간
+- 오버타임 상태 표시
+- 차례 넘기기 버튼
+- 잠깐 쉬기 버튼
+- 종료 버튼
+
+상태별 UI:
+- Normal: 현재 턴 남은 시간을 크게 표시
+- Warning: “10초 남았습니다” 또는 설정된 문구 표시
+- Overtime: “오버타임 +00:12”처럼 증가 표시
+- Penalty: “오버타임 기준에 도달했어요” 표시
+- NeedsExtension: 시간 추가/종료 선택 표시
+
+TimerEngine의 TimerSnapshot과 TimerEvent를 사용해서 UI를 갱신해줘.
+```
+
+## Prompt 8 — FeedbackService 만들기
+```text
+FeedbackService를 만들어줘.
+
+목표:
+- TimerEvent와 AlertConfig를 받아서 화면 표시, 소리, 진동/햅틱 요청을 처리한다.
+- 실제 플랫폼 API 호출은 어댑터로 분리한다.
+- 테스트에서는 MockFeedbackAdapter를 사용할 수 있게 한다.
+
+필요 기능:
+- handleTurnWarning
+- handleTotalWarning
+- handleOvertimeStarted
+- handlePenaltyReached
+- playSound
+- triggerHaptic
+- showVisualCue
+
+요구사항:
+- visualEnabled가 false면 화면 알림을 만들지 않는다.
+- soundEnabled가 false면 소리를 재생하지 않는다.
+- hapticEnabled가 false면 햅틱을 실행하지 않는다.
+- 같은 이벤트가 중복 실행되지 않도록 이벤트 id를 받을 수 있게 해줘.
+```
+
+## Prompt 9 — 휴식, 시간 연장, 종료
+```text
+BreakScreen, TimeExtensionScreen, WrapUpScreen을 만들어줘.
+
+BreakScreen:
+- 모든 시간이 멈춘 상태를 보여준다.
+- 이어서 하기, 오늘은 여기까지 버튼이 있다.
+
+TimeExtensionScreen:
+- 누구에게 시간을 추가할지 선택한다.
+- 추가 시간 1분, 3분, 5분, 직접 입력을 제공한다.
+- 기본은 양쪽 동의가 필요하다.
+
+WrapUpScreen:
+- 각자 사용한 시간
+- 각자 남은 시간
+- 각자 오버타임 합계
+- 각자 패널티 횟수
 - 휴식 횟수
-- 회고 메모 3개
+- 합의한 것 입력
+- 다음에 이야기할 것 입력
+- 저장/저장하지 않기
 
-MVP에는 Hive를 사용해줘. 기록 목록과 기록 상세 화면도 만들어줘.
+승패 표현은 쓰지 마.
 ```
 
-## Prompt 10 — iOS polish
+## Prompt 10 — 로컬 기록 저장
 ```text
-iPhone 출시를 고려해 UI를 다듬어줘.
+세션 기록을 로컬에 저장하는 기능을 만들어줘.
 
-요구사항:
-- 큰 글씨에서도 레이아웃이 깨지지 않게 해줘.
-- 버튼 터치 영역을 충분히 크게 해줘.
-- VoiceOver label을 주요 버튼에 추가해줘.
-- 앱이 백그라운드에 갔다 돌아와도 타이머 상태가 복원되게 점검해줘.
+저장 항목:
+- 세션 날짜
+- 참가자 이름
+- 각자 설정한 전체 발언 시간
+- 턴당 제한
+- 오버타임 설정
+- 패널티 기준
+- 알림 설정
+- 각자 사용한 시간
+- 각자 오버타임 합계
+- 각자 패널티 횟수
+- 휴식 횟수
+- 메모
+
+기능:
+- 기록 저장
+- 기록 목록 조회
+- 기록 상세 조회
+- 기록 삭제
+- 모든 기록 삭제
+
+저장소 인터페이스와 구현체를 분리해줘.
 ```
 
-## Prompt 11 — App Store 준비
+## Prompt 11 — 앱 설정 화면
 ```text
-App Store 제출 전 점검을 도와줘.
+SettingsScreen을 만들어줘.
+
+설정 항목:
+- 기본 전체 발언 시간
+- 전체 발언 시간 기본 모드: 같은 시간 / 각자 다르게
+- 기본 턴 제한
+- 오버타임 기본값
+- 패널티 기준 기본값
+- 반복 패널티 기본값
+- 사전 알림 시점 기본값
+- 턴 시간 알림
+- 전체 시간 알림
+- 오버타임 시작 알림
+- 패널티 알림
+- 화면 표시
+- 소리
+- 진동/햅틱
+- 기록 자동 저장 여부
+- 모든 기록 삭제
+
+설정값은 다음 새 세션 생성 시 기본값으로 적용되게 해줘.
+```
+
+## Prompt 12 — iOS 마감 품질
+```text
+iOS 출시를 위해 UI와 품질을 다듬어줘.
 
 확인할 것:
-- 앱 표시 이름
-- Bundle ID
-- 앱 아이콘
-- Launch screen
-- 개인정보 처리방침 링크가 들어갈 위치
-- 지원 URL이 필요한 위치
-- 심사용 데모 시나리오
-- 앱 설명에 치료/진단/보장 표현이 없는지
+- iPhone 작은 화면에서도 TimerScreen이 잘 보이는지
+- 큰 글씨 접근성에서 레이아웃이 깨지지 않는지
+- 버튼 터치 영역이 충분한지
+- 오버타임과 패널티가 색상만이 아니라 텍스트로도 표현되는지
+- 소리/진동 설정이 실제로 적용되는지
+- 앱이 백그라운드로 갔다 돌아와도 경과 시간이 반영되는지
+- 로컬 기록 삭제가 잘 되는지
+- App Store 설명에 치료/진단 표현이 없는지
+
+필요하면 위젯 테스트와 수동 테스트 체크리스트를 추가해줘.
 ```
-
-## 커밋 메시지 예시
-- `feat: add timer domain models`
-- `test: cover timer engine state transitions`
-- `feat: add consent screen`
-- `feat: implement break mode`
-- `feat: persist session history locally`
-- `chore: prepare iOS release metadata`
-
-## 개발 중 계속 물어볼 질문
-1. 이 기능이 대화를 더 안전하게 만드는가?
-2. 이 기능이 한 사람의 통제 도구가 될 위험은 없는가?
-3. 이 기능을 빼도 MVP 검증이 가능한가?
-4. 이 데이터는 꼭 저장해야 하는가?
-5. App Store 설명에서 과장된 약속을 하고 있지 않은가?
