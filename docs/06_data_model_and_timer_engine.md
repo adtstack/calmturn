@@ -27,6 +27,14 @@ turnRemainingSeconds == 0
   -> currentTurnOvertimeSeconds starts counting up
 ```
 
+단, 사용자가 오버타임을 끄면 턴 시간이 0이 되는 순간 자동 휴식 상태로 이동한다. 자동 휴식 중에는 시간이 흐르지 않고, 오버타임과 패널티도 기록하지 않는다.
+
+```text
+overtimeConfig.enabled == false
+turnRemainingSeconds == 0
+  -> Paused
+```
+
 ### 2.3 패널티는 오버타임 기준 도달 이벤트다
 기본값은 오버타임 60초다.
 
@@ -160,7 +168,7 @@ class OvertimeConfig {
 }
 ```
 
-MVP 기본값은 `TurnLimitBehavior.overtime`이다. `autoSwitch`, `autoPause`는 후속 버전 옵션으로 둔다.
+MVP 기본값은 `TurnLimitBehavior.overtime`이다. 사용자가 오버타임을 끄면 `TurnLimitBehavior.autoPause`를 사용한다. `autoPause`에서는 턴 시간이 0이 되는 순간 `TimerPhase.paused`로 이동하고, 이후 `passTurn()`을 누르면 상대 차례가 새 턴으로 시작된다. `autoSwitch`는 후속 버전 후보로 둔다.
 
 ### PenaltyConfig
 ```dart

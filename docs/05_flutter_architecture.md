@@ -98,8 +98,8 @@ SessionRecord
 - countUp
 - behavior
   - overtime
+  - autoPause, when overtime is disabled
   - autoSwitch, future
-  - autoPause, future
 
 ### PenaltyConfig
 - enabled
