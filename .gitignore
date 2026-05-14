@@ -1,5 +1,19 @@
 .DS_Store
+*.iml
 .idea/
+
+# Dart / Flutter
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .pub-cache/
-build/
+.pub/
+/build/
+/coverage/
+**/doc/api/
+app.*.symbols
+app.*.map.json
+
+# Default Flutter web template icons; replace with tracked brand assets later.
+web/favicon.png
+web/icons/
