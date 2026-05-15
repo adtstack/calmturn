@@ -1,7 +1,7 @@
 # 05. Flutter Architecture
 
 ## 1. 기술 선택
-Flutter는 iOS와 Android를 하나의 코드베이스로 만들 수 있고, iOS 스타일 UI를 위해 Cupertino 위젯을 사용할 수 있다. MVP는 Flutter로 충분하며, iPhone 출시도 가능하다.
+Flutter는 Android와 iOS를 하나의 코드베이스로 만들 수 있다. 우선순위는 Android/Flutter MVP이며, UI는 Android에서 자연스러운 Material 기반을 기본으로 둔다.
 
 ## 2. 권장 구조
 ```text
@@ -258,7 +258,7 @@ App
 - Wrap-up 요약 표시
 
 ### 수동 테스트
-- 실제 iPhone에서 햅틱/진동 확인
+- 실제 Android 기기에서 진동/햅틱 확인
 - 소리 설정 확인
 - 화면이 잠깐 꺼졌다 돌아온 후 타이머 확인
 - 긴 세션에서 시간 오차 확인

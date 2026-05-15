@@ -48,9 +48,9 @@ v2까지의 핵심은 “공평한 전체 시간 + 턴당 제한 + 번갈아 말
 6. `05_flutter_architecture.md` — Flutter 개발 구조와 기술 설계
 7. `06_data_model_and_timer_engine.md` — 데이터 모델과 타이머 엔진
 8. `07_safety_privacy.md` — 안전·윤리·개인정보 원칙
-9. `08_ios_launch_checklist.md` — iPhone/App Store 출시 체크리스트
+9. `08_android_launch_checklist.md` — Android/Google Play 출시 체크리스트
 10. `09_vibe_coding_prompts.md` — 차근차근 개발하기 위한 프롬프트 세트
-11. `10_copy_and_brand.md` — 앱 문구, 온보딩, 앱스토어 문구 초안
+11. `10_copy_and_brand.md` — 앱 문구, 온보딩, Google Play 문구 초안
 12. `11_time_rules.md` — 전체 시간, 턴 제한, 오버타임, 패널티 규칙
 13. `12_settings_and_notifications.md` — 설정값과 알림 정책
 
@@ -60,11 +60,11 @@ v2까지의 핵심은 “공평한 전체 시간 + 턴당 제한 + 번갈아 말
 3. `01_prd.md`로 제품 범위와 요구사항을 확인합니다.
 4. `06_data_model_and_timer_engine.md`를 기준으로 타이머 엔진을 구현합니다.
 5. `09_vibe_coding_prompts.md`의 Prompt 0부터 순서대로 개발합니다.
-6. TestFlight 전에는 `07_safety_privacy.md`와 `08_ios_launch_checklist.md`를 다시 확인합니다.
+6. Android 내부 테스트 전에는 `07_safety_privacy.md`와 `08_android_launch_checklist.md`를 다시 확인합니다.
 
 ## 공식 참고 자료
-- Flutter iOS 배포 문서: https://docs.flutter.dev/deployment/ios
-- Flutter Cupertino widgets: https://docs.flutter.dev/ui/widgets/cupertino
-- Apple App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/
-- Apple App Privacy Details: https://developer.apple.com/app-store/app-privacy-details/
-- Apple TestFlight/App Store 제출 안내: https://developer.apple.com/app-store/submitting/
+- Flutter Android 배포 문서: https://docs.flutter.dev/deployment/android
+- Flutter Material widgets: https://docs.flutter.dev/ui/widgets/material
+- Android 앱 빌드 문서: https://developer.android.com/studio/run
+- Google Play Console 도움말: https://support.google.com/googleplay/android-developer
+- Google Play Data safety: https://support.google.com/googleplay/android-developer/answer/10787469

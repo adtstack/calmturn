@@ -1,23 +1,23 @@
-# 08. iOS / App Store Launch Checklist
+# 08. Android / Google Play Launch Checklist
 
 ## 1. 개발 환경
-- macOS 기기
-- Xcode 설치
+- Android Studio 설치
 - Flutter SDK
-- Apple Developer Program 가입
-- 실제 iPhone 테스트 기기
+- Android SDK / command-line tools
+- Google Play Console 계정, Play 배포 시 필요
+- 실제 Android 테스트 기기
 
-## 2. Flutter iOS 준비
-- Bundle ID 정하기
+## 2. Flutter Android 준비
+- Application ID 정하기
   - 예: `com.yourcompany.malcharye`
 - 앱 표시 이름 정하기
   - 예: `말차례` 또는 `말차례 CalmTurn`
-- iOS 최소 버전 결정
+- Android minSdk/targetSdk 결정
 - 앱 아이콘 추가
-- Launch screen 설정
-- Release 빌드 테스트
+- Splash screen 설정
+- Release APK/AAB 빌드 테스트
 
-## 3. v3 기능 기준 iOS 테스트 항목
+## 3. v3 기능 기준 Android 테스트 항목
 ### 타이머
 - 각자 같은 전체 시간으로 시작
 - 각자 다른 전체 시간으로 시작
@@ -47,18 +47,18 @@
 - 기록 삭제
 - 모든 기록 삭제
 
-## 4. App Store Connect 준비
-- 앱 레코드 생성
-- Bundle ID 연결
+## 4. Google Play Console 준비
+- 앱 생성
+- Application ID 연결
 - 카테고리 선택
 - 가격 및 배포 국가 설정
 - 개인정보 처리방침 URL 준비
 - 지원 URL 준비
-- 앱 설명, 부제, 키워드 작성
+- 앱 설명, 짧은 설명, 키워드성 문구 작성
 - 스크린샷 준비
 
 ## 5. 개인정보 제출 준비
-MVP가 로컬 저장만 한다면 개인정보 설명이 단순해진다. 그래도 App Store Connect에는 앱과 서드파티 SDK가 수집하는 데이터를 정확히 입력해야 한다.
+MVP가 로컬 저장만 한다면 개인정보 설명이 단순해진다. 그래도 Play Console Data safety에는 앱과 서드파티 SDK가 수집하는 데이터를 정확히 입력해야 한다.
 
 확인할 것:
 - 분석 SDK를 넣었는가?
@@ -77,8 +77,8 @@ MVP 원칙:
 - 연락처 없음
 - 광고 추적 없음
 
-## 6. TestFlight
-TestFlight에서는 다음을 확인한다.
+## 6. Android 내부 테스트
+Google Play 내부 테스트 또는 직접 APK 설치 테스트에서는 다음을 확인한다.
 
 - 부부/연인 사용자가 패널티 표현을 부담스러워하지 않는가?
 - “오버타임 표시”와 “패널티” 중 어떤 표현을 선호하는가?
@@ -91,13 +91,13 @@ TestFlight에서는 다음을 확인한다.
 ## 7. 접근성
 - 큰 글씨에서도 화면이 깨지지 않는지 확인
 - 색상만으로 상태를 구분하지 않기
-- VoiceOver 라벨 확인
+- TalkBack 라벨 확인
 - 버튼 터치 영역 충분히 크게 하기
 - 소리 없이도 알림을 알 수 있게 하기
 - 진동 없이도 알림을 알 수 있게 하기
 - 오버타임과 패널티 상태를 텍스트로 표시하기
 
-## 8. 앱스토어 설명 초안 기준
+## 8. Google Play 설명 초안 기준
 피해야 할 표현:
 - 싸움을 해결합니다
 - 관계를 치료합니다
@@ -127,9 +127,9 @@ TestFlight에서는 다음을 확인한다.
 - [ ] 앱 아이콘 제작
 - [ ] 런치 화면 제작
 - [ ] v3 타이머 엔진 단위 테스트 통과
-- [ ] 실제 iPhone에서 햅틱/소리 확인
-- [ ] App Store 설명 작성
-- [ ] TestFlight 배포
+- [ ] 실제 Android 기기에서 진동/소리 확인
+- [ ] Google Play 설명 작성
+- [ ] Android 내부 테스트 또는 APK/AAB 배포
 - [ ] 베타 피드백 반영
 - [ ] 스크린샷 제작
-- [ ] App Store 심사 제출
+- [ ] Google Play 검토 제출
