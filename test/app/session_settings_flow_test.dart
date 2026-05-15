@@ -31,21 +31,34 @@ void main() {
     startButton = await _startButton(tester);
     expect(startButton.onPressed, isNotNull);
 
-    await _tapText(tester, 'Start Timer');
+    await _tapText(tester, 'Start Timer', settle: false);
+    await tester.pump();
 
-    expect(find.text('A'), findsWidgets);
-    expect(find.text('B'), findsWidgets);
+    expect(find.text('A is speaking'), findsOneWidget);
     expect(find.text('3:00'), findsWidgets);
+    await tester.scrollUntilVisible(find.text('7:00'), 240);
+    await tester.pump();
+    expect(find.text('B'), findsWidgets);
     expect(find.text('7:00'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
 
-Future<void> _tapText(WidgetTester tester, String text) async {
+Future<void> _tapText(
+  WidgetTester tester,
+  String text, {
+  bool settle = true,
+}) async {
   final finder = find.text(text).last;
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<CupertinoButton> _startButton(WidgetTester tester) async {
