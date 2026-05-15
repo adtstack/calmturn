@@ -163,6 +163,70 @@ void main() {
       _expectParticipant(snapshot, 'a', totalRemainingSeconds: 0);
       _expectEquals(_eventsOf<TotalTimeEndedEvent>(events).length, 1);
     },
+    'total time ending exactly with turn limit enters needs extension': () {
+      final engine = TimerEngine.start(_config(aTotal: 60));
+
+      final events = engine.tick(const Duration(seconds: 60));
+      final snapshot = engine.snapshot();
+
+      _expectEquals(snapshot.phase, TimerPhase.needsExtension);
+      _expectEquals(snapshot.currentTurnRemainingSeconds, 0);
+      _expectEquals(snapshot.currentTurnOvertimeSeconds, 0);
+      _expectParticipant(
+        snapshot,
+        'a',
+        totalRemainingSeconds: 0,
+        totalUsedSeconds: 60,
+      );
+      _expectEquals(_eventsOf<TotalTimeEndedEvent>(events).length, 1);
+      _expectEquals(_eventsOf<OvertimeStartedEvent>(events).length, 0);
+    },
+    'add time from needs extension resumes active participant': () {
+      final engine = TimerEngine.start(_config(aTotal: 3));
+      engine.tick(const Duration(seconds: 3));
+
+      final events = engine.addTime('a', 60);
+      final snapshot = engine.snapshot();
+
+      _expectEquals(snapshot.phase, TimerPhase.runningNormal);
+      _expectEquals(snapshot.activeParticipantId, 'a');
+      _expectEquals(snapshot.currentTurnRemainingSeconds, 60);
+      _expectEquals(snapshot.currentTurnOvertimeSeconds, 0);
+      _expectParticipant(
+        snapshot,
+        'a',
+        totalAllocatedSeconds: 63,
+        totalRemainingSeconds: 60,
+      );
+      _expectEquals(_eventsOf<TimeAddedEvent>(events).length, 1);
+    },
+    'multiple turns accumulate participant totals and turn counts': () {
+      final engine = TimerEngine.start(_config());
+      engine.tick(const Duration(seconds: 20));
+      engine.passTurn();
+      engine.tick(const Duration(seconds: 15));
+      engine.passTurn();
+
+      engine.tick(const Duration(seconds: 25));
+      final snapshot = engine.snapshot();
+
+      _expectEquals(snapshot.activeParticipantId, 'a');
+      _expectEquals(snapshot.currentTurnRemainingSeconds, 35);
+      _expectParticipant(
+        snapshot,
+        'a',
+        totalRemainingSeconds: 255,
+        totalUsedSeconds: 45,
+        turnCount: 1,
+      );
+      _expectParticipant(
+        snapshot,
+        'b',
+        totalRemainingSeconds: 285,
+        totalUsedSeconds: 15,
+        turnCount: 1,
+      );
+    },
     'disabled overtime auto pauses at turn end': () {
       final engine = TimerEngine.start(
         _config(

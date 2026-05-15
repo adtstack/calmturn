@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import 'features/settings/session_setup_page.dart';
 import 'features/timer/domain/timer_engine.dart';
 import 'features/timer/domain/timer_models.dart';
 
@@ -30,13 +31,42 @@ final class CalmTurnApp extends StatelessWidget {
           ),
         ),
       ),
-      home: TimerHomePage(),
+      home: _CalmTurnRoot(),
     );
   }
 }
 
+final class _CalmTurnRoot extends StatefulWidget {
+  const _CalmTurnRoot();
+
+  @override
+  State<_CalmTurnRoot> createState() => _CalmTurnRootState();
+}
+
+final class _CalmTurnRootState extends State<_CalmTurnRoot> {
+  SessionConfig? _sessionConfig;
+
+  @override
+  Widget build(BuildContext context) {
+    final config = _sessionConfig;
+    if (config == null) {
+      return SessionSetupPage(
+        onSessionAccepted: (acceptedConfig) {
+          setState(() {
+            _sessionConfig = acceptedConfig;
+          });
+        },
+      );
+    }
+
+    return TimerHomePage(config: config);
+  }
+}
+
 final class TimerHomePage extends StatefulWidget {
-  const TimerHomePage({super.key});
+  final SessionConfig config;
+
+  const TimerHomePage({super.key, required this.config});
 
   @override
   State<TimerHomePage> createState() => _TimerHomePageState();
@@ -59,7 +89,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   @override
   void initState() {
     super.initState();
-    _engine = TimerEngine.start(_defaultConfig());
+    _engine = TimerEngine.start(widget.config);
   }
 
   @override
@@ -119,7 +149,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   void _reset() {
     _stopTicker();
     setState(() {
-      _engine = TimerEngine.start(_defaultConfig());
+      _engine = TimerEngine.start(widget.config);
       _lastEvents = const [];
     });
   }
@@ -138,10 +168,10 @@ final class _TimerHomePageState extends State<TimerHomePage> {
             _SessionHeader(
               phase: _phaseLabel(snapshot.phase),
               activeName: activeParticipant.name,
-              turnRemaining: _formatSeconds(
+              turnRemaining: formatSeconds(
                 snapshot.currentTurnRemainingSeconds,
               ),
-              overtime: _formatSeconds(snapshot.currentTurnOvertimeSeconds),
+              overtime: formatSeconds(snapshot.currentTurnOvertimeSeconds),
             ),
             const SizedBox(height: 18),
             ...snapshot.participants.map((participant) {
@@ -274,13 +304,13 @@ final class _ParticipantPanel extends StatelessWidget {
               Expanded(
                 child: _Metric(
                   label: 'Remaining',
-                  value: _formatSeconds(participant.totalRemainingSeconds),
+                  value: formatSeconds(participant.totalRemainingSeconds),
                 ),
               ),
               Expanded(
                 child: _Metric(
                   label: 'Used',
-                  value: _formatSeconds(participant.totalUsedSeconds),
+                  value: formatSeconds(participant.totalUsedSeconds),
                 ),
               ),
               Expanded(
@@ -399,32 +429,6 @@ final class _EventLog extends StatelessWidget {
   }
 }
 
-SessionConfig _defaultConfig() {
-  return const SessionConfig(
-    participantA: ParticipantConfig(
-      id: 'a',
-      name: 'Speaker A',
-      totalAllocatedSeconds: 300,
-    ),
-    participantB: ParticipantConfig(
-      id: 'b',
-      name: 'Speaker B',
-      totalAllocatedSeconds: 300,
-    ),
-    turnLimitSeconds: 60,
-    firstSpeakerId: 'a',
-    overtimeConfig: OvertimeConfig(),
-    penaltyConfig: PenaltyConfig(),
-    alertConfig: AlertConfig(warningBeforeSeconds: 10),
-  );
-}
-
-String _formatSeconds(int seconds) {
-  final minutes = seconds ~/ 60;
-  final remainder = seconds % 60;
-  return '$minutes:${remainder.toString().padLeft(2, '0')}';
-}
-
 String _phaseLabel(TimerPhase phase) {
   return switch (phase) {
     TimerPhase.draft => 'Draft',
@@ -440,9 +444,9 @@ String _phaseLabel(TimerPhase phase) {
 String _eventLabel(TimerEvent event) {
   return switch (event) {
     TurnWarningEvent(:final participantId, :final remainingSeconds) =>
-      '$participantId turn warning: ${_formatSeconds(remainingSeconds)}',
+      '$participantId turn warning: ${formatSeconds(remainingSeconds)}',
     TotalWarningEvent(:final participantId, :final remainingSeconds) =>
-      '$participantId total warning: ${_formatSeconds(remainingSeconds)}',
+      '$participantId total warning: ${formatSeconds(remainingSeconds)}',
     OvertimeStartedEvent(:final participantId) =>
       '$participantId entered overtime',
     PenaltyReachedEvent(
@@ -450,7 +454,7 @@ String _eventLabel(TimerEvent event) {
       :final overtimeSeconds,
       :final penaltyCount,
     ) =>
-      '$participantId penalty $penaltyCount at ${_formatSeconds(overtimeSeconds)}',
+      '$participantId penalty $penaltyCount at ${formatSeconds(overtimeSeconds)}',
     TurnPassedEvent(:final fromParticipantId, :final toParticipantId) =>
       '$fromParticipantId passed to $toParticipantId',
     TotalTimeEndedEvent(:final participantId) =>
@@ -458,6 +462,6 @@ String _eventLabel(TimerEvent event) {
     SessionPausedEvent(:final participantId) => '$participantId paused',
     SessionFinishedEvent() => 'Session finished',
     TimeAddedEvent(:final participantId, :final addedSeconds) =>
-      '$participantId added ${_formatSeconds(addedSeconds)}',
+      '$participantId added ${formatSeconds(addedSeconds)}',
   };
 }
