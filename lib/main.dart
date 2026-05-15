@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import 'features/history/session_record.dart';
+import 'features/history/session_record_store.dart';
+import 'features/history/wrap_up_page.dart';
 import 'features/settings/session_setup_page.dart';
 import 'features/timer/domain/timer_engine.dart';
 import 'features/timer/domain/timer_models.dart';
@@ -67,11 +70,13 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
 final class TimerHomePage extends StatefulWidget {
   final SessionConfig config;
   final TimerFeedbackService feedbackService;
+  final SessionRecordStore? recordStore;
 
   const TimerHomePage({
     super.key,
     required this.config,
     this.feedbackService = const TimerFeedbackService(),
+    this.recordStore,
   });
 
   @override
@@ -80,9 +85,15 @@ final class TimerHomePage extends StatefulWidget {
 
 final class _TimerHomePageState extends State<TimerHomePage> {
   late TimerEngine _engine;
+  late SessionRecordStore _recordStore;
+  late DateTime _startedAt;
   Timer? _ticker;
   List<TimerEvent> _lastEvents = const [];
   List<TimerFeedbackCue> _feedbackCues = const [];
+  SessionRecord? _wrapUpRecord;
+  int _breakCount = 0;
+  int _totalBreakSeconds = 0;
+  DateTime? _breakStartedAt;
 
   TimerSnapshot get _snapshot => _engine.snapshot();
 
@@ -96,7 +107,8 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   @override
   void initState() {
     super.initState();
-    _engine = TimerEngine.start(widget.config);
+    _recordStore = widget.recordStore ?? JsonSessionRecordStore.local();
+    _beginSession();
     _startTickerAfterBuild();
   }
 
@@ -104,13 +116,15 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   void didUpdateWidget(covariant TimerHomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.config == widget.config) {
+      if (oldWidget.recordStore != widget.recordStore &&
+          widget.recordStore != null) {
+        _recordStore = widget.recordStore!;
+      }
       return;
     }
 
     _stopTicker();
-    _engine = TimerEngine.start(widget.config);
-    _lastEvents = const [];
-    _feedbackCues = const [];
+    _beginSession();
     _startTickerAfterBuild();
   }
 
@@ -143,6 +157,17 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     _ticker = null;
   }
 
+  void _beginSession() {
+    _engine = TimerEngine.start(widget.config);
+    _startedAt = DateTime.now();
+    _lastEvents = const [];
+    _feedbackCues = const [];
+    _wrapUpRecord = null;
+    _breakCount = 0;
+    _totalBreakSeconds = 0;
+    _breakStartedAt = null;
+  }
+
   void _commit(List<TimerEvent> events) {
     final cues = events.isEmpty
         ? _feedbackCues
@@ -172,12 +197,18 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       if (!_engine.canResume) {
         return;
       }
+      _finishActiveBreak(DateTime.now());
       _commit(_engine.resume());
       _startTicker();
       return;
     }
 
-    _commit(_engine.pause());
+    final events = _engine.pause();
+    if (events.isNotEmpty) {
+      _breakCount += 1;
+      _breakStartedAt = DateTime.now();
+    }
+    _commit(events);
     _stopTicker();
   }
 
@@ -196,22 +227,58 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 
   void _finish() {
-    _commit(_engine.finish());
+    final endedAt = DateTime.now();
+    final endReason = _snapshot.phase == TimerPhase.needsExtension
+        ? SessionEndReason.timeEnded
+        : SessionEndReason.endedByUser;
+    _finishActiveBreak(endedAt);
+    final events = _engine.finish();
+    final record = SessionRecord.fromTimerSnapshot(
+      id: newSessionRecordId(endedAt),
+      config: widget.config,
+      snapshot: _engine.snapshot(),
+      startedAt: _startedAt,
+      endedAt: endedAt,
+      endReason: endReason,
+      breakCount: _breakCount,
+      totalBreakSeconds: _totalBreakSeconds,
+    );
     _stopTicker();
+    setState(() {
+      _lastEvents = events;
+      _feedbackCues = const [];
+      _wrapUpRecord = record;
+    });
   }
 
   void _reset() {
     _stopTicker();
     setState(() {
-      _engine = TimerEngine.start(widget.config);
-      _lastEvents = const [];
-      _feedbackCues = const [];
+      _beginSession();
     });
     _startTicker();
   }
 
+  void _finishActiveBreak(DateTime endedAt) {
+    final startedAt = _breakStartedAt;
+    if (startedAt == null) {
+      return;
+    }
+    _totalBreakSeconds += endedAt.difference(startedAt).inSeconds;
+    _breakStartedAt = null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final wrapUpRecord = _wrapUpRecord;
+    if (wrapUpRecord != null) {
+      return WrapUpPage(
+        draftRecord: wrapUpRecord,
+        recordStore: _recordStore,
+        onStartAnotherSession: _reset,
+      );
+    }
+
     final snapshot = _snapshot;
     final activeParticipant = _participant(snapshot.activeParticipantId);
     final showOvertime = widget.config.overtimeConfig.showOvertime;
