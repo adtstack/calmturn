@@ -61,9 +61,8 @@ final class TimerFeedbackService {
     List<TimerEvent> events,
     SessionConfig config,
   ) {
-    final alert = config.alertConfig;
     return events
-        .map((event) => _cueForEvent(event, alert))
+        .map((event) => _cueForEvent(event, config))
         .whereType<TimerFeedbackCue>()
         .toList(growable: false);
   }
@@ -79,7 +78,9 @@ final class TimerFeedbackService {
     }
   }
 
-  TimerFeedbackCue? _cueForEvent(TimerEvent event, AlertConfig alert) {
+  TimerFeedbackCue? _cueForEvent(TimerEvent event, SessionConfig config) {
+    final alert = config.alertConfig;
+    final showOvertime = config.overtimeConfig.showOvertime;
     final message = switch (event) {
       TurnWarningEvent(:final remainingSeconds) when alert.turnWarningEnabled =>
         '${remainingSeconds.toString()} seconds left in this turn.',
@@ -87,9 +88,13 @@ final class TimerFeedbackService {
           when alert.totalWarningEnabled =>
         '${remainingSeconds.toString()} seconds of total time left.',
       OvertimeStartedEvent() when alert.overtimeStartAlertEnabled =>
-        'Overtime started. Pass the turn when ready.',
+        showOvertime
+            ? 'Overtime started. Pass the turn when ready.'
+            : 'Turn limit reached. Pass the turn when ready.',
       PenaltyReachedEvent(:final penaltyCount) when alert.penaltyAlertEnabled =>
-        'Overtime mark reached. Mark $penaltyCount recorded.',
+        showOvertime
+            ? 'Overtime mark reached. Mark $penaltyCount recorded.'
+            : 'Mark $penaltyCount recorded.',
       _ => null,
     };
 
@@ -97,6 +102,8 @@ final class TimerFeedbackService {
       return null;
     }
 
+    // SDK sound/haptic calls cannot reliably prove delivery across targets,
+    // so non-visual alerts keep a screen fallback unless a richer sink exists.
     final nonVisualRequested = alert.soundEnabled || alert.hapticEnabled;
     return TimerFeedbackCue(
       message: message,

@@ -84,6 +84,79 @@ void main() {
     await _tapText(tester, 'End session');
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('visible overtime shows counters and penalty marks', (
+    tester,
+  ) async {
+    await _pumpTimer(
+      tester,
+      _config(penaltyConfig: const PenaltyConfig(thresholdSeconds: 5)),
+    );
+
+    await tester.pump(const Duration(seconds: 65));
+    await tester.pump();
+
+    expect(find.text('+0:05'), findsOneWidget);
+    expect(find.text('Overtime +0:05'), findsOneWidget);
+    expect(find.text('Overtime total'), findsWidgets);
+    expect(find.textContaining('Mark 1 recorded.'), findsOneWidget);
+
+    await _tapText(tester, 'End session');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('hidden overtime setting suppresses explicit overtime counters', (
+    tester,
+  ) async {
+    await _pumpTimer(
+      tester,
+      _config(
+        overtimeConfig: const OvertimeConfig(showOvertime: false),
+        penaltyConfig: const PenaltyConfig(thresholdSeconds: 5),
+      ),
+    );
+
+    await tester.pump(const Duration(seconds: 65));
+    await tester.pump();
+
+    expect(find.text('Time is up'), findsOneWidget);
+    expect(find.text('+0:05'), findsNothing);
+    expect(find.text('Overtime +0:05'), findsNothing);
+    expect(find.text('Overtime total'), findsNothing);
+    expect(find.textContaining('Overtime'), findsNothing);
+
+    await _tapText(tester, 'End session');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('auto pause directs the user to pass turn instead of resume', (
+    tester,
+  ) async {
+    await _pumpTimer(
+      tester,
+      _config(
+        overtimeConfig: const OvertimeConfig(
+          enabled: false,
+          showOvertime: false,
+          behavior: TurnLimitBehavior.autoPause,
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(seconds: 60));
+    await tester.pump();
+
+    expect(find.text('Turn limit reached'), findsOneWidget);
+    expect(find.text('Pass turn to continue.'), findsOneWidget);
+    expect(find.text('Turn ended'), findsOneWidget);
+    expect(find.text('Resume'), findsNothing);
+
+    await _tapText(tester, 'Pass turn');
+    expect(find.text('B is speaking'), findsOneWidget);
+
+    await _tapText(tester, 'End session');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
 
 Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
@@ -110,7 +183,11 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.pump();
 }
 
-SessionConfig _config({AlertConfig alertConfig = const AlertConfig()}) {
+SessionConfig _config({
+  AlertConfig alertConfig = const AlertConfig(),
+  OvertimeConfig overtimeConfig = const OvertimeConfig(),
+  PenaltyConfig penaltyConfig = const PenaltyConfig(),
+}) {
   return SessionConfig(
     participantA: const ParticipantConfig(
       id: 'a',
@@ -124,8 +201,8 @@ SessionConfig _config({AlertConfig alertConfig = const AlertConfig()}) {
     ),
     turnLimitSeconds: 60,
     firstSpeakerId: 'a',
-    overtimeConfig: const OvertimeConfig(),
-    penaltyConfig: const PenaltyConfig(),
+    overtimeConfig: overtimeConfig,
+    penaltyConfig: penaltyConfig,
     alertConfig: alertConfig,
   );
 }

@@ -169,6 +169,9 @@ final class _TimerHomePageState extends State<TimerHomePage> {
 
   void _takeBreakOrResume() {
     if (_snapshot.phase == TimerPhase.paused) {
+      if (!_engine.canResume) {
+        return;
+      }
       _commit(_engine.resume());
       _startTicker();
       return;
@@ -211,6 +214,8 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     final activeParticipant = _participant(snapshot.activeParticipantId);
+    final showOvertime = widget.config.overtimeConfig.showOvertime;
+    final canResume = _engine.canResume;
 
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(middle: Text('CalmTurn')),
@@ -222,10 +227,13 @@ final class _TimerHomePageState extends State<TimerHomePage> {
               snapshot: snapshot,
               activeParticipant: activeParticipant,
               feedbackCues: _feedbackCues,
+              showOvertime: showOvertime,
+              canResume: canResume,
             ),
             const SizedBox(height: 18),
             _Controls(
               phase: snapshot.phase,
+              canResume: canResume,
               canPass:
                   snapshot.phase != TimerPhase.finished &&
                   snapshot.phase != TimerPhase.needsExtension,
@@ -242,11 +250,12 @@ final class _TimerHomePageState extends State<TimerHomePage> {
                 child: _ParticipantPanel(
                   participant: participant,
                   isActive: participant.id == snapshot.activeParticipantId,
+                  showOvertime: showOvertime,
                 ),
               );
             }),
             const SizedBox(height: 18),
-            _EventLog(events: _lastEvents),
+            _EventLog(events: _lastEvents, showOvertime: showOvertime),
           ],
         ),
       ),
@@ -262,18 +271,26 @@ final class _LiveTimerHero extends StatelessWidget {
   final TimerSnapshot snapshot;
   final Participant activeParticipant;
   final List<TimerFeedbackCue> feedbackCues;
+  final bool showOvertime;
+  final bool canResume;
 
   const _LiveTimerHero({
     required this.snapshot,
     required this.activeParticipant,
     required this.feedbackCues,
+    required this.showOvertime,
+    required this.canResume,
   });
 
   @override
   Widget build(BuildContext context) {
     final isOvertime = snapshot.phase == TimerPhase.runningOvertime;
+    final isAutoPaused = snapshot.phase == TimerPhase.paused && !canResume;
+    final needsTurnLimitTone = isOvertime || isAutoPaused;
     final primaryTime = isOvertime
-        ? '+${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
+        ? showOvertime
+              ? '+${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
+              : 'Time is up'
         : formatSeconds(snapshot.currentTurnRemainingSeconds);
 
     return Container(
@@ -282,7 +299,9 @@ final class _LiveTimerHero extends StatelessWidget {
         color: const Color(0xFFFAFAF7),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isOvertime ? const Color(0xFFC98B2B) : const Color(0xFF2D6A64),
+          color: needsTurnLimitTone
+              ? const Color(0xFFC98B2B)
+              : const Color(0xFF2D6A64),
           width: 2,
         ),
       ),
@@ -299,7 +318,11 @@ final class _LiveTimerHero extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            _headline(snapshot.phase, activeParticipant.name),
+            _headline(
+              snapshot.phase,
+              activeParticipant.name,
+              canResume: canResume,
+            ),
             style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
@@ -307,10 +330,10 @@ final class _LiveTimerHero extends StatelessWidget {
             child: Text(
               primaryTime,
               style: TextStyle(
-                color: isOvertime
+                color: needsTurnLimitTone
                     ? const Color(0xFF8A5A13)
                     : const Color(0xFF1C2523),
-                fontSize: 58,
+                fontSize: isOvertime && !showOvertime ? 38 : 58,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -333,8 +356,9 @@ final class _LiveTimerHero extends StatelessWidget {
               ),
             ],
           ),
-          if (snapshot.phase == TimerPhase.runningOvertime ||
-              snapshot.currentTurnOvertimeSeconds > 0) ...[
+          if (showOvertime &&
+              (snapshot.phase == TimerPhase.runningOvertime ||
+                  snapshot.currentTurnOvertimeSeconds > 0)) ...[
             const SizedBox(height: 12),
             _NoticeLine(
               'Overtime +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
@@ -353,8 +377,13 @@ final class _LiveTimerHero extends StatelessWidget {
 final class _ParticipantPanel extends StatelessWidget {
   final Participant participant;
   final bool isActive;
+  final bool showOvertime;
 
-  const _ParticipantPanel({required this.participant, required this.isActive});
+  const _ParticipantPanel({
+    required this.participant,
+    required this.isActive,
+    required this.showOvertime,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -402,11 +431,13 @@ final class _ParticipantPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _Metric(
-            label: 'Overtime total',
-            value: formatSeconds(participant.overtimeTotalSeconds),
-          ),
+          if (showOvertime) ...[
+            const SizedBox(height: 12),
+            _Metric(
+              label: 'Overtime total',
+              value: formatSeconds(participant.overtimeTotalSeconds),
+            ),
+          ],
         ],
       ),
     );
@@ -444,6 +475,7 @@ final class _Metric extends StatelessWidget {
 
 final class _Controls extends StatelessWidget {
   final TimerPhase phase;
+  final bool canResume;
   final bool canPass;
   final VoidCallback onBreakOrResume;
   final VoidCallback onPassTurn;
@@ -453,6 +485,7 @@ final class _Controls extends StatelessWidget {
 
   const _Controls({
     required this.phase,
+    required this.canResume,
     required this.canPass,
     required this.onBreakOrResume,
     required this.onPassTurn,
@@ -466,8 +499,9 @@ final class _Controls extends StatelessWidget {
     final canBreak =
         phase == TimerPhase.runningNormal ||
         phase == TimerPhase.runningOvertime ||
-        phase == TimerPhase.paused;
+        (phase == TimerPhase.paused && canResume);
     final isPaused = phase == TimerPhase.paused;
+    final isAutoPaused = isPaused && !canResume;
     final isFinished = phase == TimerPhase.finished;
 
     return Column(
@@ -478,6 +512,10 @@ final class _Controls extends StatelessWidget {
           onPressed: canPass ? onPassTurn : null,
           child: const Text('Pass turn'),
         ),
+        if (isAutoPaused) ...[
+          const SizedBox(height: 8),
+          const _NoticeLine('Pass turn to continue.'),
+        ],
         const SizedBox(height: 10),
         Row(
           children: [
@@ -486,7 +524,11 @@ final class _Controls extends StatelessWidget {
                 color: const Color(0xFF1C2523),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 onPressed: canBreak ? onBreakOrResume : null,
-                child: Text(isPaused ? 'Resume' : 'Take break'),
+                child: Text(
+                  isPaused
+                      ? (canResume ? 'Resume' : 'Turn ended')
+                      : 'Take break',
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -552,14 +594,15 @@ final class _FeedbackBanner extends StatelessWidget {
 
 final class _EventLog extends StatelessWidget {
   final List<TimerEvent> events;
+  final bool showOvertime;
 
-  const _EventLog({required this.events});
+  const _EventLog({required this.events, required this.showOvertime});
 
   @override
   Widget build(BuildContext context) {
     final label = events.isEmpty
         ? 'No events yet'
-        : events.map(_eventLabel).join('\n');
+        : events.map((event) => _eventLabel(event, showOvertime)).join('\n');
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -589,29 +632,37 @@ final class _NoticeLine extends StatelessWidget {
   }
 }
 
-String _headline(TimerPhase phase, String activeName) {
+String _headline(
+  TimerPhase phase,
+  String activeName, {
+  required bool canResume,
+}) {
   return switch (phase) {
-    TimerPhase.paused => 'Taking a break',
+    TimerPhase.paused => canResume ? 'Taking a break' : 'Turn limit reached',
     TimerPhase.needsExtension => '$activeName needs more time',
     TimerPhase.finished => 'Session finished',
     _ => '$activeName is speaking',
   };
 }
 
-String _eventLabel(TimerEvent event) {
+String _eventLabel(TimerEvent event, bool showOvertime) {
   return switch (event) {
     TurnWarningEvent(:final participantId, :final remainingSeconds) =>
       '$participantId turn warning: ${formatSeconds(remainingSeconds)}',
     TotalWarningEvent(:final participantId, :final remainingSeconds) =>
       '$participantId total warning: ${formatSeconds(remainingSeconds)}',
     OvertimeStartedEvent(:final participantId) =>
-      '$participantId entered overtime',
+      showOvertime
+          ? '$participantId entered overtime'
+          : '$participantId reached turn limit',
     PenaltyReachedEvent(
       :final participantId,
       :final overtimeSeconds,
       :final penaltyCount,
     ) =>
-      '$participantId penalty $penaltyCount at ${formatSeconds(overtimeSeconds)}',
+      showOvertime
+          ? '$participantId penalty $penaltyCount at ${formatSeconds(overtimeSeconds)}'
+          : '$participantId mark $penaltyCount recorded',
     TurnPassedEvent(:final fromParticipantId, :final toParticipantId) =>
       '$fromParticipantId passed to $toParticipantId',
     TotalTimeEndedEvent(:final participantId) =>
