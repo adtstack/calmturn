@@ -133,3 +133,26 @@ Google Play 내부 테스트 또는 직접 APK 설치 테스트에서는 다음�
 - [ ] 베타 피드백 반영
 - [ ] 스크린샷 제작
 - [ ] Google Play 검토 제출
+
+## 11. 현재 Android 스캐폴드 주의사항
+현재 `android/` 폴더는 Android Studio에서 실행하고 APK/AAB 빌드를 확인하기 위한 초기 스캐폴드다. 출시 전에 아래 항목은 반드시 다시 결정하고 반영한다.
+
+- [ ] Application ID를 기본값 `com.example.calmturn`에서 실제 소유 도메인 기반 ID로 변경한다.
+  - 후보 예시: `pro.thirdb.malcharye`, `pro.thirdb.calmturn`
+  - Google Play에 한 번 등록한 Application ID는 앱 정체성이 되므로 임시값으로 출시하지 않는다.
+- [ ] Android `namespace`와 Kotlin `MainActivity` 패키지 경로가 Application ID 정책과 맞는지 확인한다.
+- [ ] 앱 표시명을 최종 확정한다.
+  - 현재 임시 표시명: `CalmTurn`
+  - 후보 예시: `말차례`, `말차례 CalmTurn`, `CalmTurn`
+- [ ] 기본 Flutter 런처 아이콘을 브랜드 아이콘으로 교체한다.
+- [ ] 기본 흰색/템플릿 런치 화면을 제품 톤에 맞는 Splash screen으로 교체한다.
+- [ ] Release 빌드 서명을 debug signing이 아닌 실제 release keystore로 바꾼다.
+- [ ] `versionCode`와 `versionName` 증가 규칙을 정한다.
+- [ ] `minSdk`와 `targetSdk`가 Google Play 요구사항과 실제 테스트 기기 범위에 맞는지 확인한다.
+- [ ] Android SDK `cmdline-tools`가 설치되어 있고 `flutter doctor`에서 Android toolchain이 통과하는지 확인한다.
+- [ ] Android SDK 라이선스가 모두 수락되어 있는지 확인한다.
+- [ ] 진동, 소리, 화면 알림을 실제 Android 기기에서 확인한다.
+- [ ] 권한 목록을 점검하고 불필요한 권한이 추가되지 않았는지 확인한다.
+- [ ] 개인정보 처리방침 URL과 지원 URL을 준비한다.
+- [ ] Google Play Data safety 답변을 MVP 원칙에 맞게 작성한다.
+- [ ] 내부 테스트 트랙에 AAB를 올리기 전에 APK 직접 설치 테스트를 먼저 수행한다.
