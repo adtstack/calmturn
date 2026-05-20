@@ -40,6 +40,10 @@ final class TimerEngine {
 
   TimerSnapshot snapshot() => _snapshot;
 
+  bool get canResume {
+    return _snapshot.phase == TimerPhase.paused && _resumePhase != null;
+  }
+
   List<TimerEvent> tick(Duration elapsed) {
     final seconds = elapsed.inSeconds;
     if (seconds <= 0) {
