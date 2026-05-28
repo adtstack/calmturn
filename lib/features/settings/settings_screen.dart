@@ -1,115 +1,67 @@
 import 'package:flutter/cupertino.dart';
 
+import '../history/session_record_store.dart';
 import '../timer/domain/timer_models.dart';
+import 'app_settings.dart';
+import 'session_setup_page.dart';
 import 'session_settings.dart';
 
-final class SessionSetupPage extends StatefulWidget {
-  final ValueChanged<SessionConfig> onSessionAccepted;
-  final SessionSettingsDraft initialDraft;
-  final VoidCallback? onOpenAppSettings;
+final class SettingsScreen extends StatefulWidget {
+  final AppSettingsDraft settings;
+  final ValueChanged<AppSettingsDraft> onSettingsChanged;
+  final VoidCallback onBack;
+  final SessionRecordStore recordStore;
 
-  SessionSetupPage({
+  const SettingsScreen({
     super.key,
-    required this.onSessionAccepted,
-    SessionSettingsDraft? initialDraft,
-    this.onOpenAppSettings,
-  }) : initialDraft = initialDraft ?? SessionSettingsDraft.defaults();
+    required this.settings,
+    required this.onSettingsChanged,
+    required this.onBack,
+    required this.recordStore,
+  });
 
   @override
-  State<SessionSetupPage> createState() => _SessionSetupPageState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-final class _SessionSetupPageState extends State<SessionSetupPage> {
-  final _participantAController = TextEditingController();
-  final _participantBController = TextEditingController();
+final class _SettingsScreenState extends State<SettingsScreen> {
+  late AppSettingsDraft _settings;
+  bool _isBusy = false;
+  String? _statusMessage;
 
-  late SessionSettingsDraft _draft;
-  bool _isReviewing = false;
-  bool _participantAAgreed = false;
-  bool _participantBAgreed = false;
+  SessionSettingsDraft get _draft => _settings.sessionDefaults;
 
   @override
   void initState() {
     super.initState();
-    _draft = widget.initialDraft;
-    _participantAController.text = _draft.participantAName;
-    _participantBController.text = _draft.participantBName;
-  }
-
-  @override
-  void dispose() {
-    _participantAController.dispose();
-    _participantBController.dispose();
-    super.dispose();
+    _settings = widget.settings;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isReviewing) {
-      return _ConsentView(
-        config: _draft.toSessionConfig(),
-        participantAAgreed: _participantAAgreed,
-        participantBAgreed: _participantBAgreed,
-        onBack: () {
-          setState(() {
-            _isReviewing = false;
-          });
-        },
-        onParticipantAAgreed: () {
-          setState(() {
-            _participantAAgreed = !_participantAAgreed;
-          });
-        },
-        onParticipantBAgreed: () {
-          setState(() {
-            _participantBAgreed = !_participantBAgreed;
-          });
-        },
-        onStart: () {
-          widget.onSessionAccepted(_draft.toSessionConfig());
-        },
-      );
-    }
-
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Session Settings'),
-        trailing: widget.onOpenAppSettings == null
-            ? null
-            : CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: widget.onOpenAppSettings,
-                child: const Text('App settings'),
-              ),
+        middle: const Text('App Settings'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: widget.onBack,
+          child: const Text('Back to setup'),
+        ),
       ),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
-            _Section(
-              title: 'Participants',
-              children: [
-                _FieldLabel('Participant A'),
-                CupertinoTextField(
-                  controller: _participantAController,
-                  placeholder: 'Speaker A',
-                  textInputAction: TextInputAction.next,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(participantAName: value));
-                  },
-                ),
-                const SizedBox(height: 12),
-                _FieldLabel('Participant B'),
-                CupertinoTextField(
-                  controller: _participantBController,
-                  placeholder: 'Speaker B',
-                  textInputAction: TextInputAction.done,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(participantBName: value));
-                  },
-                ),
-              ],
+            const Text(
+              'Defaults for new sessions',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
+            const SizedBox(height: 8),
+            const Text(
+              'These values are used the next time the session setup screen opens.',
+              style: TextStyle(color: Color(0xFF5F6964)),
+            ),
+            const SizedBox(height: 18),
             _Section(
               title: 'Speaking Time',
               children: [
@@ -192,7 +144,7 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               ],
             ),
             _Section(
-              title: 'Overtime & Marks',
+              title: 'Overtime & Penalty',
               children: [
                 _ToggleRow(
                   label: 'Overtime',
@@ -206,16 +158,6 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                     );
                   },
                 ),
-                _ToggleRow(
-                  label: 'Show overtime',
-                  value: _draft.showOvertime,
-                  onChanged: _draft.overtimeEnabled
-                      ? (value) {
-                          _updateDraft(_draft.copyWith(showOvertime: value));
-                        }
-                      : null,
-                ),
-                const SizedBox(height: 12),
                 _ChoiceGroup<int>(
                   value: _draft.penaltyThresholdSeconds,
                   options: const [
@@ -319,43 +261,34 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               ],
             ),
             _Section(
-              title: 'First Speaker',
+              title: 'Records',
               children: [
-                _ChoiceGroup<String>(
-                  value: _draft.firstSpeakerId,
-                  options: [
-                    ChoiceOption(
-                      _nameOrFallback(
-                        _draft.participantAName,
-                        'Speaker A first',
-                      ),
-                      SessionSettingsDraft.participantAId,
-                    ),
-                    ChoiceOption(
-                      _nameOrFallback(
-                        _draft.participantBName,
-                        'Speaker B first',
-                      ),
-                      SessionSettingsDraft.participantBId,
-                    ),
-                  ],
-                  onSelected: (value) {
-                    _updateDraft(_draft.copyWith(firstSpeakerId: value));
+                _ToggleRow(
+                  label: 'Auto-save records',
+                  value: _settings.autoSaveRecords,
+                  onChanged: (value) {
+                    setState(() {
+                      _settings = _settings.copyWith(autoSaveRecords: value);
+                      _statusMessage = null;
+                    });
                   },
+                ),
+                const SizedBox(height: 10),
+                CupertinoButton(
+                  color: CupertinoColors.systemRed,
+                  onPressed: _isBusy ? null : _clearRecords,
+                  child: const Text('Delete all records'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
             CupertinoButton.filled(
-              onPressed: () {
-                setState(() {
-                  _participantAAgreed = false;
-                  _participantBAgreed = false;
-                  _isReviewing = true;
-                });
-              },
-              child: const Text('Review rules'),
+              onPressed: _saveSettings,
+              child: const Text('Save settings'),
             ),
+            if (_statusMessage != null) ...[
+              const SizedBox(height: 12),
+              _StatusLine(_statusMessage!),
+            ],
           ],
         ),
       ),
@@ -364,123 +297,32 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
 
   void _updateDraft(SessionSettingsDraft draft) {
     setState(() {
-      _draft = draft;
+      _settings = _settings.copyWith(sessionDefaults: draft);
+      _statusMessage = null;
     });
   }
-}
 
-final class _ConsentView extends StatelessWidget {
-  final SessionConfig config;
-  final bool participantAAgreed;
-  final bool participantBAgreed;
-  final VoidCallback onBack;
-  final VoidCallback onParticipantAAgreed;
-  final VoidCallback onParticipantBAgreed;
-  final VoidCallback onStart;
-
-  const _ConsentView({
-    required this.config,
-    required this.participantAAgreed,
-    required this.participantBAgreed,
-    required this.onBack,
-    required this.onParticipantAAgreed,
-    required this.onParticipantBAgreed,
-    required this.onStart,
-  });
-
-  bool get _canStart => participantAAgreed && participantBAgreed;
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('Consent'),
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: onBack,
-          child: const Text('Edit'),
-        ),
-      ),
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
-          children: [
-            const Text(
-              '서로 동의한 시간 배분',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Both people review the same rules before the timer starts.',
-              style: TextStyle(color: Color(0xFF5F6964), fontSize: 15),
-            ),
-            const SizedBox(height: 18),
-            _Section(
-              title: 'Rules',
-              children: [
-                _RuleLine(
-                  '${config.participantA.name} total: '
-                  '${formatSeconds(config.participantA.totalAllocatedSeconds)}',
-                ),
-                _RuleLine(
-                  '${config.participantB.name} total: '
-                  '${formatSeconds(config.participantB.totalAllocatedSeconds)}',
-                ),
-                _RuleLine(
-                  'Turn limit: ${formatSeconds(config.turnLimitSeconds)}',
-                ),
-                _RuleLine(
-                  'Overtime: ${config.overtimeConfig.enabled ? 'On' : 'Off'}',
-                ),
-                _RuleLine(
-                  'Overtime mark: '
-                  '${formatSeconds(config.penaltyConfig.thresholdSeconds)}',
-                ),
-                _RuleLine('Alerts: ${alertMethodsLabel(config.alertConfig)}'),
-                _RuleLine(
-                  'First speaker: '
-                  '${_participantName(config, config.firstSpeakerId)}',
-                ),
-              ],
-            ),
-            if (config.participantA.totalAllocatedSeconds !=
-                config.participantB.totalAllocatedSeconds) ...[
-              const SizedBox(height: 12),
-              const _Notice(
-                'This session uses different total speaking times. '
-                'Both people should confirm the allocation before starting.',
-              ),
-            ],
-            const SizedBox(height: 16),
-            _AgreementButton(
-              label: '${config.participantA.name} agrees',
-              agreed: participantAAgreed,
-              onPressed: onParticipantAAgreed,
-            ),
-            const SizedBox(height: 10),
-            _AgreementButton(
-              label: '${config.participantB.name} agrees',
-              agreed: participantBAgreed,
-              onPressed: onParticipantBAgreed,
-            ),
-            const SizedBox(height: 16),
-            CupertinoButton.filled(
-              key: const ValueKey('start-timer-button'),
-              onPressed: _canStart ? onStart : null,
-              child: const Text('Start Timer'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _saveSettings() {
+    widget.onSettingsChanged(_settings);
+    setState(() {
+      _statusMessage = 'Settings saved for the next session.';
+    });
   }
-}
 
-final class ChoiceOption<T> {
-  final String label;
-  final T value;
-
-  const ChoiceOption(this.label, this.value);
+  Future<void> _clearRecords() async {
+    setState(() {
+      _isBusy = true;
+      _statusMessage = null;
+    });
+    await widget.recordStore.clear();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isBusy = false;
+      _statusMessage = 'All records deleted.';
+    });
+  }
 }
 
 final class _ChoiceGroup<T> extends StatelessWidget {
@@ -569,33 +411,6 @@ final class _ToggleRow extends StatelessWidget {
   }
 }
 
-final class _AgreementButton extends StatelessWidget {
-  final String label;
-  final bool agreed;
-  final VoidCallback onPressed;
-
-  const _AgreementButton({
-    required this.label,
-    required this.agreed,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoButton(
-      color: agreed ? const Color(0xFF2D6A64) : const Color(0xFFECE7DB),
-      onPressed: onPressed,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: agreed ? CupertinoColors.white : const Color(0xFF1C2523),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
 final class _Section extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -634,85 +449,20 @@ final class _Section extends StatelessWidget {
   }
 }
 
-final class _FieldLabel extends StatelessWidget {
-  final String label;
-
-  const _FieldLabel(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF5F6964),
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-final class _RuleLine extends StatelessWidget {
+final class _StatusLine extends StatelessWidget {
   final String text;
 
-  const _RuleLine(this.text);
+  const _StatusLine(this.text);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF2D6A64),
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
-}
-
-final class _Notice extends StatelessWidget {
-  final String text;
-
-  const _Notice(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE7F1EC),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(padding: const EdgeInsets.all(14), child: Text(text)),
-    );
-  }
-}
-
-String formatSeconds(int seconds) {
-  final minutes = seconds ~/ 60;
-  final remainder = seconds % 60;
-  return '$minutes:${remainder.toString().padLeft(2, '0')}';
-}
-
-String alertMethodsLabel(AlertConfig config) {
-  final methods = <String>[
-    if (config.visualEnabled) 'Screen',
-    if (config.soundEnabled) 'Sound',
-    if (config.hapticEnabled) 'Vibration',
-  ];
-
-  return methods.isEmpty ? 'Off' : methods.join(' + ');
-}
-
-String _nameOrFallback(String value, String fallback) {
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? fallback : '$trimmed first';
-}
-
-String _participantName(SessionConfig config, String id) {
-  if (config.participantA.id == id) {
-    return config.participantA.name;
-  }
-  return config.participantB.name;
 }

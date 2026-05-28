@@ -5,7 +5,9 @@ import 'package:flutter/cupertino.dart';
 import 'features/history/session_record.dart';
 import 'features/history/session_record_store.dart';
 import 'features/history/wrap_up_page.dart';
+import 'features/settings/app_settings.dart';
 import 'features/settings/session_setup_page.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/timer/domain/timer_engine.dart';
 import 'features/timer/domain/timer_models.dart';
 import 'features/timer/timer_feedback.dart';
@@ -48,13 +50,45 @@ final class _CalmTurnRoot extends StatefulWidget {
 }
 
 final class _CalmTurnRootState extends State<_CalmTurnRoot> {
+  late final SessionRecordStore _recordStore;
   SessionConfig? _sessionConfig;
+  AppSettingsDraft _appSettings = AppSettingsDraft.defaults();
+  bool _isEditingAppSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordStore = JsonSessionRecordStore.local();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isEditingAppSettings) {
+      return SettingsScreen(
+        settings: _appSettings,
+        recordStore: _recordStore,
+        onSettingsChanged: (settings) {
+          setState(() {
+            _appSettings = settings;
+          });
+        },
+        onBack: () {
+          setState(() {
+            _isEditingAppSettings = false;
+          });
+        },
+      );
+    }
+
     final config = _sessionConfig;
     if (config == null) {
       return SessionSetupPage(
+        initialDraft: _appSettings.sessionDefaults,
+        onOpenAppSettings: () {
+          setState(() {
+            _isEditingAppSettings = true;
+          });
+        },
         onSessionAccepted: (acceptedConfig) {
           setState(() {
             _sessionConfig = acceptedConfig;
@@ -63,7 +97,11 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
       );
     }
 
-    return TimerHomePage(config: config);
+    return TimerHomePage(
+      config: config,
+      recordStore: _recordStore,
+      autoSaveRecords: _appSettings.autoSaveRecords,
+    );
   }
 }
 
@@ -71,12 +109,14 @@ final class TimerHomePage extends StatefulWidget {
   final SessionConfig config;
   final TimerFeedbackService feedbackService;
   final SessionRecordStore? recordStore;
+  final bool autoSaveRecords;
 
   const TimerHomePage({
     super.key,
     required this.config,
     this.feedbackService = const TimerFeedbackService(),
     this.recordStore,
+    this.autoSaveRecords = false,
   });
 
   @override
@@ -243,6 +283,9 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       breakCount: _breakCount,
       totalBreakSeconds: _totalBreakSeconds,
     );
+    if (widget.autoSaveRecords) {
+      unawaited(_recordStore.save(record));
+    }
     _stopTicker();
     setState(() {
       _lastEvents = events;
