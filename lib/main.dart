@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
@@ -6,6 +7,9 @@ import 'features/history/session_record.dart';
 import 'features/history/session_record_store.dart';
 import 'features/history/wrap_up_page.dart';
 import 'features/settings/app_settings.dart';
+import 'features/settings/app_settings_platform_storage_stub.dart'
+    if (dart.library.io) 'features/settings/app_settings_platform_storage_io.dart'
+    as platform_storage;
 import 'features/settings/session_setup_page.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/timer/domain/timer_engine.dart';
@@ -13,18 +17,22 @@ import 'features/timer/domain/timer_models.dart';
 import 'features/timer/timer_feedback.dart';
 
 void main() {
+  platform_storage.configurePlatformAppSettingsStorage();
   runApp(const CalmTurnApp());
 }
 
 final class CalmTurnApp extends StatelessWidget {
-  const CalmTurnApp({super.key});
+  final AppSettingsStore? settingsStore;
+  final SessionRecordStore? recordStore;
+
+  const CalmTurnApp({super.key, this.settingsStore, this.recordStore});
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoApp(
+    return CupertinoApp(
       debugShowCheckedModeBanner: false,
       title: 'CalmTurn',
-      theme: CupertinoThemeData(
+      theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: Color(0xFF2D6A64),
         scaffoldBackgroundColor: Color(0xFFF6F4EF),
@@ -37,32 +45,76 @@ final class CalmTurnApp extends StatelessWidget {
           ),
         ),
       ),
-      home: _CalmTurnRoot(),
+      home: _CalmTurnRoot(
+        settingsStore: settingsStore,
+        recordStore: recordStore,
+      ),
     );
   }
 }
 
 final class _CalmTurnRoot extends StatefulWidget {
-  const _CalmTurnRoot();
+  final AppSettingsStore? settingsStore;
+  final SessionRecordStore? recordStore;
+
+  const _CalmTurnRoot({this.settingsStore, this.recordStore});
 
   @override
   State<_CalmTurnRoot> createState() => _CalmTurnRootState();
 }
 
 final class _CalmTurnRootState extends State<_CalmTurnRoot> {
+  late final AppSettingsStore _settingsStore;
   late final SessionRecordStore _recordStore;
   SessionConfig? _sessionConfig;
   AppSettingsDraft _appSettings = AppSettingsDraft.defaults();
   bool _isEditingAppSettings = false;
+  bool _isLoadingSettings = true;
 
   @override
   void initState() {
     super.initState();
-    _recordStore = JsonSessionRecordStore.local();
+    _settingsStore = widget.settingsStore ?? JsonAppSettingsStore.local();
+    _recordStore = widget.recordStore ?? JsonSessionRecordStore.local();
+    unawaited(_loadSettings());
+  }
+
+  Future<void> _loadSettings() async {
+    SessionConfig? config;
+    try {
+      config = await _settingsStore.loadSessionConfig();
+    } catch (_) {
+      config = null;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _sessionConfig = config;
+      _isLoadingSettings = false;
+    });
+  }
+
+  Future<void> _acceptSession(SessionConfig acceptedConfig) async {
+    try {
+      await _settingsStore.saveSessionConfig(acceptedConfig);
+    } catch (_) {}
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _sessionConfig = acceptedConfig;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingSettings) {
+      return const CupertinoPageScaffold(
+        child: Center(child: Text('Loading settings')),
+      );
+    }
+
     if (_isEditingAppSettings) {
       return SettingsScreen(
         settings: _appSettings,
@@ -90,9 +142,7 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
           });
         },
         onSessionAccepted: (acceptedConfig) {
-          setState(() {
-            _sessionConfig = acceptedConfig;
-          });
+          unawaited(_acceptSession(acceptedConfig));
         },
       );
     }
@@ -128,7 +178,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   late SessionRecordStore _recordStore;
   late DateTime _startedAt;
   Timer? _ticker;
-  List<TimerEvent> _lastEvents = const [];
   List<TimerFeedbackCue> _feedbackCues = const [];
   SessionRecord? _wrapUpRecord;
   int _breakCount = 0;
@@ -200,7 +249,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   void _beginSession() {
     _engine = TimerEngine.start(widget.config);
     _startedAt = DateTime.now();
-    _lastEvents = const [];
     _feedbackCues = const [];
     _wrapUpRecord = null;
     _breakCount = 0;
@@ -221,7 +269,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     final shouldStop = !_isRunningPhase;
     setState(() {
       if (events.isNotEmpty) {
-        _lastEvents = events;
         _feedbackCues = cues
             .where((cue) => cue.showOnScreen)
             .toList(growable: false);
@@ -272,7 +319,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
         ? SessionEndReason.timeEnded
         : SessionEndReason.endedByUser;
     _finishActiveBreak(endedAt);
-    final events = _engine.finish();
+    _engine.finish();
     final record = SessionRecord.fromTimerSnapshot(
       id: newSessionRecordId(endedAt),
       config: widget.config,
@@ -288,7 +335,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     }
     _stopTicker();
     setState(() {
-      _lastEvents = events;
       _feedbackCues = const [];
       _wrapUpRecord = record;
     });
@@ -323,49 +369,76 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     }
 
     final snapshot = _snapshot;
-    final activeParticipant = _participant(snapshot.activeParticipantId);
+    final participantA = _participant(widget.config.participantA.id);
+    final participantB = _participant(widget.config.participantB.id);
     final showOvertime = widget.config.overtimeConfig.showOvertime;
     final canResume = _engine.canResume;
+    final canPass =
+        snapshot.phase != TimerPhase.finished &&
+        snapshot.phase != TimerPhase.needsExtension;
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('CalmTurn')),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
+        child: Stack(
           children: [
-            _LiveTimerHero(
-              snapshot: snapshot,
-              activeParticipant: activeParticipant,
-              feedbackCues: _feedbackCues,
-              showOvertime: showOvertime,
-              canResume: canResume,
-            ),
-            const SizedBox(height: 18),
-            _Controls(
-              phase: snapshot.phase,
-              canResume: canResume,
-              canPass:
-                  snapshot.phase != TimerPhase.finished &&
-                  snapshot.phase != TimerPhase.needsExtension,
-              onBreakOrResume: _takeBreakOrResume,
-              onPassTurn: _passTurn,
-              onAddMinute: _addMinute,
-              onFinish: _finish,
-              onRestart: _reset,
-            ),
-            const SizedBox(height: 18),
-            ...snapshot.participants.map((participant) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ParticipantPanel(
-                  participant: participant,
-                  isActive: participant.id == snapshot.activeParticipantId,
-                  showOvertime: showOvertime,
+            Column(
+              children: [
+                Expanded(
+                  child: _FaceTimerZone(
+                    key: const ValueKey('face-timer-top-zone'),
+                    rotationKey: const ValueKey('face-timer-top-rotation'),
+                    participant: participantB,
+                    snapshot: snapshot,
+                    feedbackCues: _feedbackCues,
+                    showOvertime: showOvertime,
+                    canResume: canResume,
+                    isRotated: true,
+                    onPassTurn: canPass ? _passTurn : null,
+                  ),
                 ),
-              );
-            }),
-            const SizedBox(height: 18),
-            _EventLog(events: _lastEvents, showOvertime: showOvertime),
+                Expanded(
+                  child: _FaceTimerZone(
+                    key: const ValueKey('face-timer-bottom-zone'),
+                    participant: participantA,
+                    snapshot: snapshot,
+                    feedbackCues: _feedbackCues,
+                    showOvertime: showOvertime,
+                    canResume: canResume,
+                    isRotated: false,
+                    onPassTurn: canPass ? _passTurn : null,
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 390),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAFAF7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFD4CEC2)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: _Controls(
+                        phase: snapshot.phase,
+                        canResume: canResume,
+                        canPass: canPass,
+                        onBreakOrResume: _takeBreakOrResume,
+                        onPassTurn: _passTurn,
+                        onAddMinute: _addMinute,
+                        onFinish: _finish,
+                        onRestart: _reset,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -377,188 +450,231 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 }
 
-final class _LiveTimerHero extends StatelessWidget {
+final class _FaceTimerZone extends StatelessWidget {
+  final Key? rotationKey;
+  final Participant participant;
   final TimerSnapshot snapshot;
-  final Participant activeParticipant;
   final List<TimerFeedbackCue> feedbackCues;
   final bool showOvertime;
   final bool canResume;
+  final bool isRotated;
+  final VoidCallback? onPassTurn;
 
-  const _LiveTimerHero({
+  const _FaceTimerZone({
+    super.key,
+    this.rotationKey,
+    required this.participant,
     required this.snapshot,
-    required this.activeParticipant,
     required this.feedbackCues,
     required this.showOvertime,
     required this.canResume,
+    required this.isRotated,
+    required this.onPassTurn,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isActive = participant.id == snapshot.activeParticipantId;
     final isOvertime = snapshot.phase == TimerPhase.runningOvertime;
     final isAutoPaused = snapshot.phase == TimerPhase.paused && !canResume;
-    final needsTurnLimitTone = isOvertime || isAutoPaused;
-    final primaryTime = isOvertime
+    final needsTurnLimitTone = isActive && (isOvertime || isAutoPaused);
+    final turnTime = isOvertime
         ? showOvertime
               ? '+${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
               : 'Time is up'
         : formatSeconds(snapshot.currentTurnRemainingSeconds);
+    final primaryTime = isActive
+        ? turnTime
+        : formatSeconds(participant.totalRemainingSeconds);
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        const horizontalPadding = 22.0;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            horizontalPadding,
+            14,
+            horizontalPadding,
+            14,
+          ),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: SizedBox(
+                width: math.max(
+                  0,
+                  constraints.maxWidth - horizontalPadding * 2,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      isActive ? 'Now speaking' : 'Waiting turn',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isActive
+                            ? const Color(0xFF2D6A64)
+                            : const Color(0xFF646B66),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isActive
+                          ? _headline(
+                              snapshot.phase,
+                              participant.name,
+                              canResume: canResume,
+                            )
+                          : '${participant.name} is listening',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      primaryTime,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: needsTurnLimitTone
+                            ? const Color(0xFF8A5A13)
+                            : const Color(0xFF1C2523),
+                        fontSize: isActive && isOvertime && !showOvertime
+                            ? 38
+                            : 62,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _Metric(
+                            label: 'Total remaining',
+                            value: formatSeconds(
+                              participant.totalRemainingSeconds,
+                            ),
+                            align: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _Metric(
+                            label: isActive ? 'Turn remaining' : 'Current turn',
+                            value: isActive
+                                ? formatSeconds(
+                                    snapshot.currentTurnRemainingSeconds,
+                                  )
+                                : 'Not speaking',
+                            align: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _Metric(
+                            label: 'Used',
+                            value: formatSeconds(participant.totalUsedSeconds),
+                            align: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (showOvertime) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Metric(
+                              label: 'Overtime total',
+                              value: formatSeconds(
+                                participant.overtimeTotalSeconds,
+                              ),
+                              align: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _Metric(
+                              label: 'Marks',
+                              value: participant.penaltyCount.toString(),
+                              align: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (isActive &&
+                        showOvertime &&
+                        (snapshot.phase == TimerPhase.runningOvertime ||
+                            snapshot.currentTurnOvertimeSeconds > 0)) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: _NoticeLine(
+                          'Overtime +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
+                        ),
+                      ),
+                    ],
+                    if (isActive && feedbackCues.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _FeedbackBanner(cues: feedbackCues),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    final rotatedContent = isRotated
+        ? Transform.rotate(key: rotationKey, angle: math.pi, child: content)
+        : content;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAFAF7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: needsTurnLimitTone
-              ? const Color(0xFFC98B2B)
-              : const Color(0xFF2D6A64),
-          width: 2,
+    return Semantics(
+      button: onPassTurn != null,
+      label: '${participant.name} timer area',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onPassTurn,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _zoneColor(isActive, needsTurnLimitTone),
+            border: Border(
+              bottom: isRotated
+                  ? const BorderSide(color: Color(0xFFCEC8BA), width: 1)
+                  : BorderSide.none,
+              top: isRotated
+                  ? BorderSide.none
+                  : const BorderSide(color: Color(0xFFCEC8BA), width: 1),
+            ),
+          ),
+          child: rotatedContent,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Now speaking',
-            style: TextStyle(
-              color: Color(0xFF2D6A64),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _headline(
-              snapshot.phase,
-              activeParticipant.name,
-              canResume: canResume,
-            ),
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: Text(
-              primaryTime,
-              style: TextStyle(
-                color: needsTurnLimitTone
-                    ? const Color(0xFF8A5A13)
-                    : const Color(0xFF1C2523),
-                fontSize: isOvertime && !showOvertime ? 38 : 58,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _Metric(
-                  label: 'Turn remaining',
-                  value: formatSeconds(snapshot.currentTurnRemainingSeconds),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _Metric(
-                  label: 'Total remaining',
-                  value: formatSeconds(activeParticipant.totalRemainingSeconds),
-                ),
-              ),
-            ],
-          ),
-          if (showOvertime &&
-              (snapshot.phase == TimerPhase.runningOvertime ||
-                  snapshot.currentTurnOvertimeSeconds > 0)) ...[
-            const SizedBox(height: 12),
-            _NoticeLine(
-              'Overtime +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
-            ),
-          ],
-          if (feedbackCues.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _FeedbackBanner(cues: feedbackCues),
-          ],
-        ],
       ),
     );
   }
 }
 
-final class _ParticipantPanel extends StatelessWidget {
-  final Participant participant;
-  final bool isActive;
-  final bool showOvertime;
-
-  const _ParticipantPanel({
-    required this.participant,
-    required this.isActive,
-    required this.showOvertime,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFFE7F1EC) : CupertinoColors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isActive ? const Color(0xFF2D6A64) : const Color(0xFFD9D4C8),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            participant.name,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          if (isActive)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 10),
-              child: _NoticeLine('Active speaker'),
-            ),
-          Row(
-            children: [
-              Expanded(
-                child: _Metric(
-                  label: 'Total remaining',
-                  value: formatSeconds(participant.totalRemainingSeconds),
-                ),
-              ),
-              Expanded(
-                child: _Metric(
-                  label: 'Used',
-                  value: formatSeconds(participant.totalUsedSeconds),
-                ),
-              ),
-              Expanded(
-                child: _Metric(
-                  label: 'Marks',
-                  value: participant.penaltyCount.toString(),
-                ),
-              ),
-            ],
-          ),
-          if (showOvertime) ...[
-            const SizedBox(height: 12),
-            _Metric(
-              label: 'Overtime total',
-              value: formatSeconds(participant.overtimeTotalSeconds),
-            ),
-          ],
-        ],
-      ),
-    );
+Color _zoneColor(bool isActive, bool needsTurnLimitTone) {
+  if (needsTurnLimitTone) {
+    return const Color(0xFFFFF0CC);
   }
+  return isActive ? const Color(0xFFE7F1EC) : const Color(0xFFF8F6F0);
 }
 
 final class _Metric extends StatelessWidget {
   final String label;
   final String value;
+  final TextAlign align;
 
-  const _Metric({required this.label, required this.value});
+  const _Metric({
+    required this.label,
+    required this.value,
+    this.align = TextAlign.start,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -567,6 +683,7 @@ final class _Metric extends StatelessWidget {
       children: [
         Text(
           label,
+          textAlign: align,
           style: const TextStyle(
             color: Color(0xFF6D746F),
             fontSize: 12,
@@ -576,6 +693,7 @@ final class _Metric extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
+          textAlign: align,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ],
@@ -615,61 +733,86 @@ final class _Controls extends StatelessWidget {
     final isFinished = phase == TimerPhase.finished;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        CupertinoButton.filled(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          onPressed: canPass ? onPassTurn : null,
-          child: const Text('Pass turn'),
-        ),
-        if (isAutoPaused) ...[
-          const SizedBox(height: 8),
-          const _NoticeLine('Pass turn to continue.'),
-        ],
-        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
+              child: CupertinoButton.filled(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                onPressed: canPass ? onPassTurn : null,
+                child: const _ControlLabel('Pass turn'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
               child: CupertinoButton(
                 color: const Color(0xFF1C2523),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: canBreak ? onBreakOrResume : null,
                 child: Text(
                   isPaused
                       ? (canResume ? 'Resume' : 'Turn ended')
                       : 'Take break',
+                  maxLines: 1,
+                  style: const TextStyle(color: CupertinoColors.white),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: CupertinoButton(
                 color: const Color(0xFF775A2C),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: isFinished ? null : onFinish,
-                child: const Text('End session'),
+                child: const _ControlLabel('End session'),
               ),
             ),
           ],
         ),
+        if (isAutoPaused) ...[
+          const SizedBox(height: 8),
+          const _NoticeLine('Pass turn to continue.'),
+        ],
         if (phase == TimerPhase.needsExtension) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           CupertinoButton(
             color: const Color(0xFF2D6A64),
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             onPressed: onAddMinute,
-            child: const Text('Add 1 minute'),
+            child: const _ControlLabel('Add 1 minute'),
           ),
         ],
         if (isFinished) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           CupertinoButton(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             onPressed: onRestart,
             child: const Text('Restart session'),
           ),
         ],
       ],
+    );
+  }
+}
+
+final class _ControlLabel extends StatelessWidget {
+  final String text;
+
+  const _ControlLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        text,
+        maxLines: 1,
+        style: const TextStyle(
+          color: CupertinoColors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -702,28 +845,6 @@ final class _FeedbackBanner extends StatelessWidget {
   }
 }
 
-final class _EventLog extends StatelessWidget {
-  final List<TimerEvent> events;
-  final bool showOvertime;
-
-  const _EventLog({required this.events, required this.showOvertime});
-
-  @override
-  Widget build(BuildContext context) {
-    final label = events.isEmpty
-        ? 'No events yet'
-        : events.map((event) => _eventLabel(event, showOvertime)).join('\n');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEE8DC),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(label),
-    );
-  }
-}
-
 final class _NoticeLine extends StatelessWidget {
   final String text;
 
@@ -752,34 +873,5 @@ String _headline(
     TimerPhase.needsExtension => '$activeName needs more time',
     TimerPhase.finished => 'Session finished',
     _ => '$activeName is speaking',
-  };
-}
-
-String _eventLabel(TimerEvent event, bool showOvertime) {
-  return switch (event) {
-    TurnWarningEvent(:final participantId, :final remainingSeconds) =>
-      '$participantId turn warning: ${formatSeconds(remainingSeconds)}',
-    TotalWarningEvent(:final participantId, :final remainingSeconds) =>
-      '$participantId total warning: ${formatSeconds(remainingSeconds)}',
-    OvertimeStartedEvent(:final participantId) =>
-      showOvertime
-          ? '$participantId entered overtime'
-          : '$participantId reached turn limit',
-    PenaltyReachedEvent(
-      :final participantId,
-      :final overtimeSeconds,
-      :final penaltyCount,
-    ) =>
-      showOvertime
-          ? '$participantId penalty $penaltyCount at ${formatSeconds(overtimeSeconds)}'
-          : '$participantId mark $penaltyCount recorded',
-    TurnPassedEvent(:final fromParticipantId, :final toParticipantId) =>
-      '$fromParticipantId passed to $toParticipantId',
-    TotalTimeEndedEvent(:final participantId) =>
-      '$participantId needs more time',
-    SessionPausedEvent(:final participantId) => '$participantId paused',
-    SessionFinishedEvent() => 'Session finished',
-    TimeAddedEvent(:final participantId, :final addedSeconds) =>
-      '$participantId added ${formatSeconds(addedSeconds)}',
   };
 }

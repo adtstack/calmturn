@@ -1,3 +1,4 @@
+import 'package:calmturn/features/settings/app_settings.dart';
 import 'package:calmturn/main.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,7 +7,11 @@ void main() {
   testWidgets('custom rules are confirmed before the timer starts', (
     tester,
   ) async {
-    await tester.pumpWidget(const CalmTurnApp());
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+    await tester.pump();
 
     await tester.enterText(find.byType(CupertinoTextField).at(0), 'A');
     await tester.enterText(find.byType(CupertinoTextField).at(1), 'B');
@@ -36,9 +41,7 @@ void main() {
 
     expect(find.text('A is speaking'), findsOneWidget);
     expect(find.text('3:00'), findsWidgets);
-    await tester.scrollUntilVisible(find.text('7:00'), 240);
-    await tester.pump();
-    expect(find.text('B'), findsWidgets);
+    expect(find.text('B is listening'), findsOneWidget);
     expect(find.text('7:00'), findsWidgets);
 
     await tester.pumpWidget(const SizedBox.shrink());

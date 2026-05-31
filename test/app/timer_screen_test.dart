@@ -43,6 +43,58 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('face timer uses mirrored zones as large touch targets', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    final topZone = find.byKey(const ValueKey('face-timer-top-zone'));
+    final bottomZone = find.byKey(const ValueKey('face-timer-bottom-zone'));
+    expect(topZone, findsOneWidget);
+    expect(bottomZone, findsOneWidget);
+    expect(tester.getSize(topZone).height, greaterThan(300));
+    expect(tester.getSize(bottomZone).height, greaterThan(300));
+
+    final topRotation = tester.widget<Transform>(
+      find.byKey(const ValueKey('face-timer-top-rotation')),
+    );
+    expect(topRotation.transform.storage[0], closeTo(-1, 0.001));
+    expect(topRotation.transform.storage[5], closeTo(-1, 0.001));
+
+    await tester.tap(find.text('A is speaking'));
+    await tester.pump();
+
+    expect(find.text('B is speaking'), findsOneWidget);
+
+    await _tapText(tester, 'End session');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('center controls keep labels readable on colored buttons', (
+    tester,
+  ) async {
+    await _pumpTimer(tester, _config());
+
+    expect(
+      tester.widget<Text>(find.text('Pass turn')).style?.color,
+      CupertinoColors.white,
+    );
+    expect(
+      tester.widget<Text>(find.text('Take break')).style?.color,
+      CupertinoColors.white,
+    );
+    expect(
+      tester.widget<Text>(find.text('End session')).style?.color,
+      CupertinoColors.white,
+    );
+
+    await _tapText(tester, 'End session');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('warning feedback uses visual alerts and screen fallback', (
     tester,
   ) async {
