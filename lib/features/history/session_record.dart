@@ -6,8 +6,8 @@ enum SessionEndReason {
 
   String get label {
     return switch (this) {
-      SessionEndReason.endedByUser => 'Ended by user',
-      SessionEndReason.timeEnded => 'Time ended',
+      SessionEndReason.endedByUser => '직접 종료',
+      SessionEndReason.timeEnded => '전체 시간 종료',
     };
   }
 }
@@ -292,10 +292,10 @@ String? _nullIfBlank(String? value) {
 
 String _alertMethodsLabel(AlertConfig config) {
   final methods = <String>[
-    if (config.visualEnabled) 'Screen',
-    if (config.soundEnabled) 'Sound',
-    if (config.hapticEnabled) 'Vibration',
+    if (config.visualEnabled) '화면',
+    if (config.soundEnabled) '소리',
+    if (config.hapticEnabled) '진동',
   ];
 
-  return methods.isEmpty ? 'Off' : methods.join(' + ');
+  return methods.isEmpty ? '꺼짐' : methods.join(' + ');
 }

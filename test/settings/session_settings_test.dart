@@ -6,8 +6,8 @@ void main() {
     'default draft builds the MVP session config': () {
       final config = SessionSettingsDraft.defaults().toSessionConfig();
 
-      _expectEquals(config.participantA.name, 'Speaker A');
-      _expectEquals(config.participantB.name, 'Speaker B');
+      _expectEquals(config.participantA.name, '말하는 사람 A');
+      _expectEquals(config.participantB.name, '말하는 사람 B');
       _expectEquals(config.participantA.totalAllocatedSeconds, 300);
       _expectEquals(config.participantB.totalAllocatedSeconds, 300);
       _expectEquals(config.turnLimitSeconds, 60);

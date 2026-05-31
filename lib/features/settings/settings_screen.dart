@@ -41,11 +41,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('App Settings'),
+        middle: const Text('설정'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: widget.onBack,
-          child: const Text('Back to setup'),
+          child: const Text('대화 규칙으로'),
         ),
       ),
       child: SafeArea(
@@ -53,26 +53,23 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
             const Text(
-              'Defaults for new sessions',
+              '앱 설정',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             const Text(
-              'These values are used the next time the session setup screen opens.',
+              '다음 대화를 시작할 때 사용할 기본 규칙입니다.',
               style: TextStyle(color: Color(0xFF5F6964)),
             ),
             const SizedBox(height: 18),
             _Section(
-              title: 'Speaking Time',
+              title: '전체 시간',
               children: [
                 _ChoiceGroup<TotalTimeMode>(
                   value: _draft.totalTimeMode,
                   options: const [
-                    ChoiceOption('Same', TotalTimeMode.same),
-                    ChoiceOption(
-                      'Different',
-                      TotalTimeMode.customPerParticipant,
-                    ),
+                    ChoiceOption('같은 시간', TotalTimeMode.same),
+                    ChoiceOption('각자 다르게', TotalTimeMode.customPerParticipant),
                   ],
                   onSelected: (value) {
                     _updateDraft(_draft.copyWith(totalTimeMode: value));
@@ -83,10 +80,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   _ChoiceGroup<int>(
                     value: _draft.sharedTotalSeconds,
                     options: const [
-                      ChoiceOption('3 min each', 180),
-                      ChoiceOption('5 min each', 300),
-                      ChoiceOption('10 min each', 600),
-                      ChoiceOption('15 min each', 900),
+                      ChoiceOption('각자 3분', 180),
+                      ChoiceOption('각자 5분', 300),
+                      ChoiceOption('각자 10분', 600),
+                      ChoiceOption('각자 15분', 900),
                     ],
                     onSelected: (value) {
                       _updateDraft(_draft.copyWith(sharedTotalSeconds: value));
@@ -96,10 +93,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   _ChoiceGroup<int>(
                     value: _draft.participantATotalSeconds,
                     options: const [
-                      ChoiceOption('A 3 min', 180),
-                      ChoiceOption('A 5 min', 300),
-                      ChoiceOption('A 7 min', 420),
-                      ChoiceOption('A 10 min', 600),
+                      ChoiceOption('A 3분', 180),
+                      ChoiceOption('A 5분', 300),
+                      ChoiceOption('A 7분', 420),
+                      ChoiceOption('A 10분', 600),
                     ],
                     onSelected: (value) {
                       _updateDraft(
@@ -111,10 +108,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   _ChoiceGroup<int>(
                     value: _draft.participantBTotalSeconds,
                     options: const [
-                      ChoiceOption('B 3 min', 180),
-                      ChoiceOption('B 5 min', 300),
-                      ChoiceOption('B 7 min', 420),
-                      ChoiceOption('B 10 min', 600),
+                      ChoiceOption('B 3분', 180),
+                      ChoiceOption('B 5분', 300),
+                      ChoiceOption('B 7분', 420),
+                      ChoiceOption('B 10분', 600),
                     ],
                     onSelected: (value) {
                       _updateDraft(
@@ -126,16 +123,16 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             _Section(
-              title: 'Turn Limit',
+              title: '턴 제한',
               children: [
                 _ChoiceGroup<int>(
                   value: _draft.turnLimitSeconds,
                   options: const [
-                    ChoiceOption('Turn 30 sec', 30),
-                    ChoiceOption('Turn 45 sec', 45),
-                    ChoiceOption('Turn 1 min', 60),
-                    ChoiceOption('Turn 90 sec', 90),
-                    ChoiceOption('Turn 2 min', 120),
+                    ChoiceOption('턴 30초', 30),
+                    ChoiceOption('턴 45초', 45),
+                    ChoiceOption('턴 1분', 60),
+                    ChoiceOption('턴 1분 30초', 90),
+                    ChoiceOption('턴 2분', 120),
                   ],
                   onSelected: (value) {
                     _updateDraft(_draft.copyWith(turnLimitSeconds: value));
@@ -144,10 +141,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             _Section(
-              title: 'Overtime & Penalty',
+              title: '오버타임',
               children: [
                 _ToggleRow(
-                  label: 'Overtime',
+                  label: '오버타임',
                   value: _draft.overtimeEnabled,
                   onChanged: (value) {
                     _updateDraft(
@@ -161,10 +158,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 _ChoiceGroup<int>(
                   value: _draft.penaltyThresholdSeconds,
                   options: const [
-                    ChoiceOption('Overtime 30 sec', 30),
-                    ChoiceOption('Overtime 1 min', 60),
-                    ChoiceOption('Overtime 2 min', 120),
-                    ChoiceOption('Overtime 3 min', 180),
+                    ChoiceOption('주의 표시 30초', 30),
+                    ChoiceOption('주의 표시 1분', 60),
+                    ChoiceOption('주의 표시 2분', 120),
+                    ChoiceOption('주의 표시 3분', 180),
                   ],
                   onSelected: (value) {
                     _updateDraft(
@@ -174,7 +171,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 _ToggleRow(
-                  label: 'Repeat marks',
+                  label: '주의 표시 반복',
                   value:
                       _draft.penaltyRepeatMode ==
                       PenaltyRepeatMode.everyThreshold,
@@ -191,15 +188,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             _Section(
-              title: 'Alerts',
+              title: '알림',
               children: [
                 _ChoiceGroup<int>(
                   value: _draft.warningBeforeSeconds,
                   options: const [
-                    ChoiceOption('Warn 5 sec', 5),
-                    ChoiceOption('Warn 10 sec', 10),
-                    ChoiceOption('Warn 15 sec', 15),
-                    ChoiceOption('Warn 30 sec', 30),
+                    ChoiceOption('5초 전', 5),
+                    ChoiceOption('10초 전', 10),
+                    ChoiceOption('15초 전', 15),
+                    ChoiceOption('30초 전', 30),
                   ],
                   onSelected: (value) {
                     _updateDraft(_draft.copyWith(warningBeforeSeconds: value));
@@ -207,21 +204,21 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 _ToggleRow(
-                  label: 'Turn time',
+                  label: '턴 시간',
                   value: _draft.turnWarningEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(turnWarningEnabled: value));
                   },
                 ),
                 _ToggleRow(
-                  label: 'Total time',
+                  label: '전체 시간',
                   value: _draft.totalWarningEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(totalWarningEnabled: value));
                   },
                 ),
                 _ToggleRow(
-                  label: 'Overtime start',
+                  label: '오버타임 시작',
                   value: _draft.overtimeStartAlertEnabled,
                   onChanged: (value) {
                     _updateDraft(
@@ -230,7 +227,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 _ToggleRow(
-                  label: 'Overtime mark',
+                  label: '주의 표시',
                   value: _draft.penaltyAlertEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
@@ -238,21 +235,21 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 _ToggleRow(
-                  label: 'Screen',
+                  label: '화면',
                   value: _draft.visualEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(visualEnabled: value));
                   },
                 ),
                 _ToggleRow(
-                  label: 'Sound',
+                  label: '소리',
                   value: _draft.soundEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(soundEnabled: value));
                   },
                 ),
                 _ToggleRow(
-                  label: 'Vibration',
+                  label: '진동',
                   value: _draft.hapticEnabled,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(hapticEnabled: value));
@@ -261,10 +258,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             _Section(
-              title: 'Records',
+              title: '기록',
               children: [
                 _ToggleRow(
-                  label: 'Auto-save records',
+                  label: '자동 저장',
                   value: _settings.autoSaveRecords,
                   onChanged: (value) {
                     setState(() {
@@ -277,13 +274,13 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 CupertinoButton(
                   color: CupertinoColors.systemRed,
                   onPressed: _isBusy ? null : _clearRecords,
-                  child: const Text('Delete all records'),
+                  child: const Text('모든 기록 삭제'),
                 ),
               ],
             ),
             CupertinoButton.filled(
               onPressed: _saveSettings,
-              child: const Text('Save settings'),
+              child: const Text('설정 저장'),
             ),
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),
@@ -305,7 +302,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   void _saveSettings() {
     widget.onSettingsChanged(_settings);
     setState(() {
-      _statusMessage = 'Settings saved for the next session.';
+      _statusMessage = '다음 대화에 사용할 설정을 저장했어요.';
     });
   }
 
@@ -320,7 +317,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     }
     setState(() {
       _isBusy = false;
-      _statusMessage = 'All records deleted.';
+      _statusMessage = '모든 기록을 삭제했어요.';
     });
   }
 }

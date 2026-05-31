@@ -9,15 +9,16 @@ void main() {
   ) async {
     await _pumpTimer(tester, _config());
 
-    expect(find.text('Now speaking'), findsOneWidget);
-    expect(find.text('A is speaking'), findsOneWidget);
-    expect(find.text('Turn remaining'), findsOneWidget);
-    expect(find.text('Total remaining'), findsWidgets);
-    expect(find.text('Pass turn'), findsOneWidget);
-    expect(find.text('Take break'), findsOneWidget);
-    expect(find.text('End session'), findsOneWidget);
+    expect(find.text('지금 말하는 중'), findsOneWidget);
+    expect(find.text('A님 차례'), findsOneWidget);
+    expect(find.text('이번 차례'), findsOneWidget);
+    expect(find.text('전체 남은 시간'), findsWidgets);
+    expect(find.text('사용한 시간'), findsNothing);
+    expect(find.text('차례 넘기기'), findsOneWidget);
+    expect(find.text('잠깐 쉬기'), findsOneWidget);
+    expect(find.text('오늘은 여기까지'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -26,19 +27,19 @@ void main() {
   ) async {
     await _pumpTimer(tester, _config());
 
-    await _tapText(tester, 'Pass turn');
-    expect(find.text('B is speaking'), findsOneWidget);
+    await _tapText(tester, '차례 넘기기');
+    expect(find.text('B님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'Take break');
-    expect(find.text('Taking a break'), findsOneWidget);
+    await _tapText(tester, '잠깐 쉬기');
+    expect(find.text('잠깐 쉬는 중'), findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
     expect(find.text('5:00'), findsWidgets);
 
-    await _tapText(tester, 'Resume');
-    expect(find.text('B is speaking'), findsOneWidget);
+    await _tapText(tester, '이어서 하기');
+    expect(find.text('B님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
-    expect(find.text('Session finished'), findsOneWidget);
+    await _tapText(tester, '오늘은 여기까지');
+    expect(find.text('대화가 끝났어요'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -64,12 +65,12 @@ void main() {
     expect(topRotation.transform.storage[0], closeTo(-1, 0.001));
     expect(topRotation.transform.storage[5], closeTo(-1, 0.001));
 
-    await tester.tap(find.text('A is speaking'));
+    await tester.tap(find.text('A님 차례'));
     await tester.pump();
 
-    expect(find.text('B is speaking'), findsOneWidget);
+    expect(find.text('B님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -79,19 +80,19 @@ void main() {
     await _pumpTimer(tester, _config());
 
     expect(
-      tester.widget<Text>(find.text('Pass turn')).style?.color,
+      tester.widget<Text>(find.text('차례 넘기기')).style?.color,
       CupertinoColors.white,
     );
     expect(
-      tester.widget<Text>(find.text('Take break')).style?.color,
+      tester.widget<Text>(find.text('잠깐 쉬기')).style?.color,
       CupertinoColors.white,
     );
     expect(
-      tester.widget<Text>(find.text('End session')).style?.color,
+      tester.widget<Text>(find.text('오늘은 여기까지')).style?.color,
       CupertinoColors.white,
     );
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -113,9 +114,9 @@ void main() {
     await tester.pump(const Duration(seconds: 50));
     await tester.pump();
 
-    expect(find.text('10 seconds left in this turn.'), findsOneWidget);
+    expect(find.text('10초 남았습니다.'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await _pumpTimer(
       tester,
       _config(
@@ -131,9 +132,9 @@ void main() {
     await tester.pump(const Duration(seconds: 50));
     await tester.pump();
 
-    expect(find.text('10 seconds left in this turn.'), findsOneWidget);
+    expect(find.text('10초 남았습니다.'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -149,11 +150,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('+0:05'), findsOneWidget);
-    expect(find.text('Overtime +0:05'), findsOneWidget);
-    expect(find.text('Overtime total'), findsWidgets);
-    expect(find.textContaining('Mark 1 recorded.'), findsOneWidget);
+    expect(find.text('오버타임 +0:05'), findsOneWidget);
+    expect(find.text('오버타임 합계'), findsNothing);
+    expect(find.textContaining('주의 표시 1회 기록'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -171,13 +172,13 @@ void main() {
     await tester.pump(const Duration(seconds: 65));
     await tester.pump();
 
-    expect(find.text('Time is up'), findsOneWidget);
+    expect(find.text('차례 시간이 끝났어요'), findsOneWidget);
     expect(find.text('+0:05'), findsNothing);
-    expect(find.text('Overtime +0:05'), findsNothing);
-    expect(find.text('Overtime total'), findsNothing);
-    expect(find.textContaining('Overtime'), findsNothing);
+    expect(find.text('오버타임 +0:05'), findsNothing);
+    expect(find.text('오버타임 합계'), findsNothing);
+    expect(find.textContaining('오버타임'), findsNothing);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -198,15 +199,15 @@ void main() {
     await tester.pump(const Duration(seconds: 60));
     await tester.pump();
 
-    expect(find.text('Turn limit reached'), findsOneWidget);
-    expect(find.text('Pass turn to continue.'), findsOneWidget);
-    expect(find.text('Turn ended'), findsOneWidget);
-    expect(find.text('Resume'), findsNothing);
+    expect(find.text('차례가 끝났어요'), findsOneWidget);
+    expect(find.text('차례를 넘기면 이어집니다.'), findsOneWidget);
+    expect(find.text('차례 끝'), findsOneWidget);
+    expect(find.text('이어서 하기'), findsNothing);
 
-    await _tapText(tester, 'Pass turn');
-    expect(find.text('B is speaking'), findsOneWidget);
+    await _tapText(tester, '차례 넘기기');
+    expect(find.text('B님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

@@ -1,11 +1,11 @@
 {
-  "name": "CalmTurn",
-  "short_name": "CalmTurn",
+  "name": "말차례 CalmTurn",
+  "short_name": "말차례",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F6F4EF",
   "theme_color": "#2D6A64",
-  "description": "A calm two-person conversation timer.",
+  "description": "서로의 말할 시간을 지켜주는 대화 시계.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false
 }

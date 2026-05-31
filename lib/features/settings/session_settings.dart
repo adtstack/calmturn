@@ -112,12 +112,12 @@ final class SessionSettingsDraft {
     return SessionConfig(
       participantA: ParticipantConfig(
         id: participantAId,
-        name: _cleanName(participantAName, 'Speaker A'),
+        name: _cleanName(participantAName, '말하는 사람 A'),
         totalAllocatedSeconds: effectiveParticipantATotalSeconds,
       ),
       participantB: ParticipantConfig(
         id: participantBId,
-        name: _cleanName(participantBName, 'Speaker B'),
+        name: _cleanName(participantBName, '말하는 사람 B'),
         totalAllocatedSeconds: effectiveParticipantBTotalSeconds,
       ),
       turnLimitSeconds: turnLimitSeconds,

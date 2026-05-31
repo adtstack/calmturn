@@ -83,18 +83,18 @@ final class TimerFeedbackService {
     final showOvertime = config.overtimeConfig.showOvertime;
     final message = switch (event) {
       TurnWarningEvent(:final remainingSeconds) when alert.turnWarningEnabled =>
-        '${remainingSeconds.toString()} seconds left in this turn.',
+        '${remainingSeconds.toString()}초 남았습니다.',
       TotalWarningEvent(:final remainingSeconds)
           when alert.totalWarningEnabled =>
-        '${remainingSeconds.toString()} seconds of total time left.',
+        '전체 시간이 ${remainingSeconds.toString()}초 남았습니다.',
       OvertimeStartedEvent() when alert.overtimeStartAlertEnabled =>
         showOvertime
-            ? 'Overtime started. Pass the turn when ready.'
-            : 'Turn limit reached. Pass the turn when ready.',
+            ? '오버타임이 시작됐어요. 준비되면 차례를 넘겨주세요.'
+            : '차례 시간이 끝났어요. 준비되면 차례를 넘겨주세요.',
       PenaltyReachedEvent(:final penaltyCount) when alert.penaltyAlertEnabled =>
         showOvertime
-            ? 'Overtime mark reached. Mark $penaltyCount recorded.'
-            : 'Mark $penaltyCount recorded.',
+            ? '오버타임 기준에 도달했어요. 주의 표시 $penaltyCount회 기록'
+            : '주의 표시 $penaltyCount회 기록',
       _ => null,
     };
 

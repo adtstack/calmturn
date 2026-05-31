@@ -13,8 +13,8 @@ void main() {
     await tester.pumpWidget(CalmTurnApp(settingsStore: store));
     await tester.pump();
 
-    expect(find.text('Session Settings'), findsOneWidget);
-    expect(find.text('Participants'), findsOneWidget);
+    expect(find.text('대화 규칙'), findsOneWidget);
+    expect(find.text('참가자'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -25,8 +25,8 @@ void main() {
     await tester.pumpWidget(CalmTurnApp(settingsStore: store));
     await tester.pump();
 
-    expect(find.text('Session Settings'), findsOneWidget);
-    expect(find.text('Participants'), findsOneWidget);
+    expect(find.text('대화 규칙'), findsOneWidget);
+    expect(find.text('참가자'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -39,23 +39,23 @@ void main() {
     await tester.pumpWidget(CalmTurnApp(settingsStore: store));
     await tester.pump();
 
-    await _tapText(tester, 'App settings');
-    expect(find.text('App Settings'), findsOneWidget);
+    await _tapText(tester, '앱 설정');
+    expect(find.text('앱 설정'), findsOneWidget);
 
-    await _tapText(tester, '10 min each');
-    await _tapText(tester, 'Turn 90 sec');
-    await _tapText(tester, 'Sound');
-    await _tapText(tester, 'Save settings');
+    await _tapText(tester, '각자 10분');
+    await _tapText(tester, '턴 1분 30초');
+    await _tapText(tester, '소리');
+    await _tapText(tester, '설정 저장');
 
-    expect(find.text('Settings saved for the next session.'), findsOneWidget);
-    await _tapText(tester, 'Back to setup');
+    expect(find.text('다음 대화에 사용할 설정을 저장했어요.'), findsOneWidget);
+    await _tapText(tester, '대화 규칙으로');
 
-    await _tapText(tester, 'Review rules');
+    await _tapText(tester, '규칙 확인');
 
-    expect(find.text('Speaker A total: 10:00'), findsOneWidget);
-    expect(find.text('Speaker B total: 10:00'), findsOneWidget);
-    expect(find.text('Turn limit: 1:30'), findsOneWidget);
-    expect(find.text('Alerts: Screen + Sound + Vibration'), findsOneWidget);
+    expect(find.text('말하는 사람 A 전체 시간: 10:00'), findsOneWidget);
+    expect(find.text('말하는 사람 B 전체 시간: 10:00'), findsOneWidget);
+    expect(find.text('턴 제한: 1:30'), findsOneWidget);
+    expect(find.text('알림: 화면 + 소리 + 진동'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -70,15 +70,15 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Session Settings'), findsNothing);
+    expect(find.text('대화 규칙'), findsNothing);
     expect(find.byKey(const ValueKey('face-timer-top-zone')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('face-timer-bottom-zone')),
       findsOneWidget,
     );
-    expect(find.text('A is speaking'), findsOneWidget);
+    expect(find.text('A님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -92,27 +92,27 @@ void main() {
 
     await tester.enterText(find.byType(CupertinoTextField).at(0), 'A');
     await tester.enterText(find.byType(CupertinoTextField).at(1), 'B');
-    await _tapText(tester, 'Review rules');
-    await _tapText(tester, 'A agrees');
-    await _tapText(tester, 'B agrees');
-    await _tapText(tester, 'Start Timer', settle: false);
+    await _tapText(tester, '규칙 확인');
+    await _tapText(tester, 'A 동의');
+    await _tapText(tester, 'B 동의');
+    await _tapText(tester, '타이머 시작', settle: false);
     await tester.pump();
 
     expect(
       find.byKey(const ValueKey('face-timer-bottom-zone')),
       findsOneWidget,
     );
-    expect(find.text('A is speaking'), findsOneWidget);
+    expect(find.text('A님 차례'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(CalmTurnApp(settingsStore: store));
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Session Settings'), findsNothing);
-    expect(find.text('A is speaking'), findsOneWidget);
+    expect(find.text('대화 규칙'), findsNothing);
+    expect(find.text('A님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -124,19 +124,19 @@ void main() {
 
     await tester.enterText(find.byType(CupertinoTextField).at(0), 'A');
     await tester.enterText(find.byType(CupertinoTextField).at(1), 'B');
-    await _tapText(tester, 'Review rules');
-    await _tapText(tester, 'A agrees');
-    await _tapText(tester, 'B agrees');
-    await _tapText(tester, 'Start Timer', settle: false);
+    await _tapText(tester, '규칙 확인');
+    await _tapText(tester, 'A 동의');
+    await _tapText(tester, 'B 동의');
+    await _tapText(tester, '타이머 시작', settle: false);
     await tester.pump();
 
     expect(
       find.byKey(const ValueKey('face-timer-bottom-zone')),
       findsOneWidget,
     );
-    expect(find.text('A is speaking'), findsOneWidget);
+    expect(find.text('A님 차례'), findsOneWidget);
 
-    await _tapText(tester, 'End session');
+    await _tapText(tester, '오늘은 여기까지');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

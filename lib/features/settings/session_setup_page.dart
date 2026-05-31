@@ -27,6 +27,7 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
   bool _isReviewing = false;
   bool _participantAAgreed = false;
   bool _participantBAgreed = false;
+  bool _showAdvanced = false;
 
   @override
   void initState() {
@@ -73,13 +74,13 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Session Settings'),
+        middle: const Text('대화 규칙'),
         trailing: widget.onOpenAppSettings == null
             ? null
             : CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: widget.onOpenAppSettings,
-                child: const Text('App settings'),
+                child: const Text('앱 설정'),
               ),
       ),
       child: SafeArea(
@@ -87,22 +88,22 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
             _Section(
-              title: 'Participants',
+              title: '참가자',
               children: [
-                _FieldLabel('Participant A'),
+                _FieldLabel('A'),
                 CupertinoTextField(
                   controller: _participantAController,
-                  placeholder: 'Speaker A',
+                  placeholder: '말하는 사람 A',
                   textInputAction: TextInputAction.next,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(participantAName: value));
                   },
                 ),
                 const SizedBox(height: 12),
-                _FieldLabel('Participant B'),
+                _FieldLabel('B'),
                 CupertinoTextField(
                   controller: _participantBController,
-                  placeholder: 'Speaker B',
+                  placeholder: '말하는 사람 B',
                   textInputAction: TextInputAction.done,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(participantBName: value));
@@ -111,30 +112,16 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               ],
             ),
             _Section(
-              title: 'Speaking Time',
+              title: '전체 시간',
               children: [
-                _ChoiceGroup<TotalTimeMode>(
-                  value: _draft.totalTimeMode,
-                  options: const [
-                    ChoiceOption('Same', TotalTimeMode.same),
-                    ChoiceOption(
-                      'Different',
-                      TotalTimeMode.customPerParticipant,
-                    ),
-                  ],
-                  onSelected: (value) {
-                    _updateDraft(_draft.copyWith(totalTimeMode: value));
-                  },
-                ),
-                const SizedBox(height: 14),
                 if (_draft.totalTimeMode == TotalTimeMode.same)
                   _ChoiceGroup<int>(
                     value: _draft.sharedTotalSeconds,
                     options: const [
-                      ChoiceOption('3 min each', 180),
-                      ChoiceOption('5 min each', 300),
-                      ChoiceOption('10 min each', 600),
-                      ChoiceOption('15 min each', 900),
+                      ChoiceOption('각자 3분', 180),
+                      ChoiceOption('각자 5분', 300),
+                      ChoiceOption('각자 10분', 600),
+                      ChoiceOption('각자 15분', 900),
                     ],
                     onSelected: (value) {
                       _updateDraft(_draft.copyWith(sharedTotalSeconds: value));
@@ -144,10 +131,10 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                   _ChoiceGroup<int>(
                     value: _draft.participantATotalSeconds,
                     options: const [
-                      ChoiceOption('A 3 min', 180),
-                      ChoiceOption('A 5 min', 300),
-                      ChoiceOption('A 7 min', 420),
-                      ChoiceOption('A 10 min', 600),
+                      ChoiceOption('A 3분', 180),
+                      ChoiceOption('A 5분', 300),
+                      ChoiceOption('A 7분', 420),
+                      ChoiceOption('A 10분', 600),
                     ],
                     onSelected: (value) {
                       _updateDraft(
@@ -159,10 +146,10 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                   _ChoiceGroup<int>(
                     value: _draft.participantBTotalSeconds,
                     options: const [
-                      ChoiceOption('B 3 min', 180),
-                      ChoiceOption('B 5 min', 300),
-                      ChoiceOption('B 7 min', 420),
-                      ChoiceOption('B 10 min', 600),
+                      ChoiceOption('B 3분', 180),
+                      ChoiceOption('B 5분', 300),
+                      ChoiceOption('B 7분', 420),
+                      ChoiceOption('B 10분', 600),
                     ],
                     onSelected: (value) {
                       _updateDraft(
@@ -174,16 +161,16 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               ],
             ),
             _Section(
-              title: 'Turn Limit',
+              title: '턴 제한',
               children: [
                 _ChoiceGroup<int>(
                   value: _draft.turnLimitSeconds,
                   options: const [
-                    ChoiceOption('Turn 30 sec', 30),
-                    ChoiceOption('Turn 45 sec', 45),
-                    ChoiceOption('Turn 1 min', 60),
-                    ChoiceOption('Turn 90 sec', 90),
-                    ChoiceOption('Turn 2 min', 120),
+                    ChoiceOption('턴 30초', 30),
+                    ChoiceOption('턴 45초', 45),
+                    ChoiceOption('턴 1분', 60),
+                    ChoiceOption('턴 1분 30초', 90),
+                    ChoiceOption('턴 2분', 120),
                   ],
                   onSelected: (value) {
                     _updateDraft(_draft.copyWith(turnLimitSeconds: value));
@@ -192,150 +179,17 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               ],
             ),
             _Section(
-              title: 'Overtime & Marks',
-              children: [
-                _ToggleRow(
-                  label: 'Overtime',
-                  value: _draft.overtimeEnabled,
-                  onChanged: (value) {
-                    _updateDraft(
-                      _draft.copyWith(
-                        overtimeEnabled: value,
-                        showOvertime: value,
-                      ),
-                    );
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Show overtime',
-                  value: _draft.showOvertime,
-                  onChanged: _draft.overtimeEnabled
-                      ? (value) {
-                          _updateDraft(_draft.copyWith(showOvertime: value));
-                        }
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                _ChoiceGroup<int>(
-                  value: _draft.penaltyThresholdSeconds,
-                  options: const [
-                    ChoiceOption('Overtime 30 sec', 30),
-                    ChoiceOption('Overtime 1 min', 60),
-                    ChoiceOption('Overtime 2 min', 120),
-                    ChoiceOption('Overtime 3 min', 180),
-                  ],
-                  onSelected: (value) {
-                    _updateDraft(
-                      _draft.copyWith(penaltyThresholdSeconds: value),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _ToggleRow(
-                  label: 'Repeat marks',
-                  value:
-                      _draft.penaltyRepeatMode ==
-                      PenaltyRepeatMode.everyThreshold,
-                  onChanged: (value) {
-                    _updateDraft(
-                      _draft.copyWith(
-                        penaltyRepeatMode: value
-                            ? PenaltyRepeatMode.everyThreshold
-                            : PenaltyRepeatMode.oncePerTurn,
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            _Section(
-              title: 'Alerts',
-              children: [
-                _ChoiceGroup<int>(
-                  value: _draft.warningBeforeSeconds,
-                  options: const [
-                    ChoiceOption('Warn 5 sec', 5),
-                    ChoiceOption('Warn 10 sec', 10),
-                    ChoiceOption('Warn 15 sec', 15),
-                    ChoiceOption('Warn 30 sec', 30),
-                  ],
-                  onSelected: (value) {
-                    _updateDraft(_draft.copyWith(warningBeforeSeconds: value));
-                  },
-                ),
-                const SizedBox(height: 12),
-                _ToggleRow(
-                  label: 'Turn time',
-                  value: _draft.turnWarningEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(turnWarningEnabled: value));
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Total time',
-                  value: _draft.totalWarningEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(totalWarningEnabled: value));
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Overtime start',
-                  value: _draft.overtimeStartAlertEnabled,
-                  onChanged: (value) {
-                    _updateDraft(
-                      _draft.copyWith(overtimeStartAlertEnabled: value),
-                    );
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Overtime mark',
-                  value: _draft.penaltyAlertEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
-                  },
-                ),
-                const SizedBox(height: 12),
-                _ToggleRow(
-                  label: 'Screen',
-                  value: _draft.visualEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(visualEnabled: value));
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Sound',
-                  value: _draft.soundEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(soundEnabled: value));
-                  },
-                ),
-                _ToggleRow(
-                  label: 'Vibration',
-                  value: _draft.hapticEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(hapticEnabled: value));
-                  },
-                ),
-              ],
-            ),
-            _Section(
-              title: 'First Speaker',
+              title: '첫 발언자',
               children: [
                 _ChoiceGroup<String>(
                   value: _draft.firstSpeakerId,
                   options: [
                     ChoiceOption(
-                      _nameOrFallback(
-                        _draft.participantAName,
-                        'Speaker A first',
-                      ),
+                      _nameOrFallback(_draft.participantAName, '말하는 사람 A'),
                       SessionSettingsDraft.participantAId,
                     ),
                     ChoiceOption(
-                      _nameOrFallback(
-                        _draft.participantBName,
-                        'Speaker B first',
-                      ),
+                      _nameOrFallback(_draft.participantBName, '말하는 사람 B'),
                       SessionSettingsDraft.participantBId,
                     ),
                   ],
@@ -345,6 +199,197 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                 ),
               ],
             ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              onPressed: () {
+                setState(() {
+                  _showAdvanced = !_showAdvanced;
+                });
+              },
+              child: Text(_showAdvanced ? '고급 설정 닫기' : '고급 설정'),
+            ),
+            if (_showAdvanced) ...[
+              _Section(
+                title: '시간 배분',
+                children: [
+                  _ChoiceGroup<TotalTimeMode>(
+                    value: _draft.totalTimeMode,
+                    options: const [
+                      ChoiceOption('같은 시간', TotalTimeMode.same),
+                      ChoiceOption(
+                        '각자 다르게',
+                        TotalTimeMode.customPerParticipant,
+                      ),
+                    ],
+                    onSelected: (value) {
+                      _updateDraft(_draft.copyWith(totalTimeMode: value));
+                    },
+                  ),
+                  if (_draft.totalTimeMode ==
+                      TotalTimeMode.customPerParticipant) ...[
+                    const SizedBox(height: 14),
+                    _ChoiceGroup<int>(
+                      value: _draft.participantATotalSeconds,
+                      options: const [
+                        ChoiceOption('A 3분', 180),
+                        ChoiceOption('A 5분', 300),
+                        ChoiceOption('A 7분', 420),
+                        ChoiceOption('A 10분', 600),
+                      ],
+                      onSelected: (value) {
+                        _updateDraft(
+                          _draft.copyWith(participantATotalSeconds: value),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _ChoiceGroup<int>(
+                      value: _draft.participantBTotalSeconds,
+                      options: const [
+                        ChoiceOption('B 3분', 180),
+                        ChoiceOption('B 5분', 300),
+                        ChoiceOption('B 7분', 420),
+                        ChoiceOption('B 10분', 600),
+                      ],
+                      onSelected: (value) {
+                        _updateDraft(
+                          _draft.copyWith(participantBTotalSeconds: value),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+              _Section(
+                title: '오버타임',
+                children: [
+                  _ToggleRow(
+                    label: '오버타임',
+                    value: _draft.overtimeEnabled,
+                    onChanged: (value) {
+                      _updateDraft(
+                        _draft.copyWith(
+                          overtimeEnabled: value,
+                          showOvertime: value,
+                        ),
+                      );
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '오버타임 표시',
+                    value: _draft.showOvertime,
+                    onChanged: _draft.overtimeEnabled
+                        ? (value) {
+                            _updateDraft(_draft.copyWith(showOvertime: value));
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  _ChoiceGroup<int>(
+                    value: _draft.penaltyThresholdSeconds,
+                    options: const [
+                      ChoiceOption('주의 표시 30초', 30),
+                      ChoiceOption('주의 표시 1분', 60),
+                      ChoiceOption('주의 표시 2분', 120),
+                      ChoiceOption('주의 표시 3분', 180),
+                    ],
+                    onSelected: (value) {
+                      _updateDraft(
+                        _draft.copyWith(penaltyThresholdSeconds: value),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _ToggleRow(
+                    label: '주의 표시 반복',
+                    value:
+                        _draft.penaltyRepeatMode ==
+                        PenaltyRepeatMode.everyThreshold,
+                    onChanged: (value) {
+                      _updateDraft(
+                        _draft.copyWith(
+                          penaltyRepeatMode: value
+                              ? PenaltyRepeatMode.everyThreshold
+                              : PenaltyRepeatMode.oncePerTurn,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              _Section(
+                title: '알림',
+                children: [
+                  _ChoiceGroup<int>(
+                    value: _draft.warningBeforeSeconds,
+                    options: const [
+                      ChoiceOption('5초 전', 5),
+                      ChoiceOption('10초 전', 10),
+                      ChoiceOption('15초 전', 15),
+                      ChoiceOption('30초 전', 30),
+                    ],
+                    onSelected: (value) {
+                      _updateDraft(
+                        _draft.copyWith(warningBeforeSeconds: value),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _ToggleRow(
+                    label: '턴 시간',
+                    value: _draft.turnWarningEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(turnWarningEnabled: value));
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '전체 시간',
+                    value: _draft.totalWarningEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(totalWarningEnabled: value));
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '오버타임 시작',
+                    value: _draft.overtimeStartAlertEnabled,
+                    onChanged: (value) {
+                      _updateDraft(
+                        _draft.copyWith(overtimeStartAlertEnabled: value),
+                      );
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '주의 표시',
+                    value: _draft.penaltyAlertEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _ToggleRow(
+                    label: '화면',
+                    value: _draft.visualEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(visualEnabled: value));
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '소리',
+                    value: _draft.soundEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(soundEnabled: value));
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '진동',
+                    value: _draft.hapticEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(hapticEnabled: value));
+                    },
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             CupertinoButton.filled(
               onPressed: () {
@@ -354,7 +399,7 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                   _isReviewing = true;
                 });
               },
-              child: const Text('Review rules'),
+              child: const Text('규칙 확인'),
             ),
           ],
         ),
@@ -394,11 +439,11 @@ final class _ConsentView extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('Consent'),
+        middle: const Text('규칙 확인'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: onBack,
-          child: const Text('Edit'),
+          child: const Text('수정'),
         ),
       ),
       child: SafeArea(
@@ -406,39 +451,37 @@ final class _ConsentView extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
             const Text(
-              '서로 동의한 시간 배분',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+              '두 사람이 같은 규칙을 보고 시작해요',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             const Text(
-              'Both people review the same rules before the timer starts.',
+              '내 차례에는 말하고, 상대 차례에는 들어요. 불편하면 언제든 잠깐 쉴 수 있어요.',
               style: TextStyle(color: Color(0xFF5F6964), fontSize: 15),
             ),
             const SizedBox(height: 18),
             _Section(
-              title: 'Rules',
+              title: '오늘의 규칙',
               children: [
                 _RuleLine(
-                  '${config.participantA.name} total: '
+                  '${config.participantA.name} 전체 시간: '
                   '${formatSeconds(config.participantA.totalAllocatedSeconds)}',
                 ),
                 _RuleLine(
-                  '${config.participantB.name} total: '
+                  '${config.participantB.name} 전체 시간: '
                   '${formatSeconds(config.participantB.totalAllocatedSeconds)}',
                 ),
+                _RuleLine('턴 제한: ${formatSeconds(config.turnLimitSeconds)}'),
                 _RuleLine(
-                  'Turn limit: ${formatSeconds(config.turnLimitSeconds)}',
+                  '오버타임: ${config.overtimeConfig.enabled ? '사용' : '사용 안 함'}',
                 ),
                 _RuleLine(
-                  'Overtime: ${config.overtimeConfig.enabled ? 'On' : 'Off'}',
-                ),
-                _RuleLine(
-                  'Overtime mark: '
+                  '주의 표시 기준: '
                   '${formatSeconds(config.penaltyConfig.thresholdSeconds)}',
                 ),
-                _RuleLine('Alerts: ${alertMethodsLabel(config.alertConfig)}'),
+                _RuleLine('알림: ${alertMethodsLabel(config.alertConfig)}'),
                 _RuleLine(
-                  'First speaker: '
+                  '첫 발언자: '
                   '${_participantName(config, config.firstSpeakerId)}',
                 ),
               ],
@@ -447,19 +490,18 @@ final class _ConsentView extends StatelessWidget {
                 config.participantB.totalAllocatedSeconds) ...[
               const SizedBox(height: 12),
               const _Notice(
-                'This session uses different total speaking times. '
-                'Both people should confirm the allocation before starting.',
+                '이번 대화는 서로 다른 전체 시간으로 설정되어 있어요. 서로 동의한 시간 배분인지 확인해주세요.',
               ),
             ],
             const SizedBox(height: 16),
             _AgreementButton(
-              label: '${config.participantA.name} agrees',
+              label: '${config.participantA.name} 동의',
               agreed: participantAAgreed,
               onPressed: onParticipantAAgreed,
             ),
             const SizedBox(height: 10),
             _AgreementButton(
-              label: '${config.participantB.name} agrees',
+              label: '${config.participantB.name} 동의',
               agreed: participantBAgreed,
               onPressed: onParticipantBAgreed,
             ),
@@ -467,7 +509,7 @@ final class _ConsentView extends StatelessWidget {
             CupertinoButton.filled(
               key: const ValueKey('start-timer-button'),
               onPressed: _canStart ? onStart : null,
-              child: const Text('Start Timer'),
+              child: const Text('타이머 시작'),
             ),
           ],
         ),
@@ -697,17 +739,17 @@ String formatSeconds(int seconds) {
 
 String alertMethodsLabel(AlertConfig config) {
   final methods = <String>[
-    if (config.visualEnabled) 'Screen',
-    if (config.soundEnabled) 'Sound',
-    if (config.hapticEnabled) 'Vibration',
+    if (config.visualEnabled) '화면',
+    if (config.soundEnabled) '소리',
+    if (config.hapticEnabled) '진동',
   ];
 
-  return methods.isEmpty ? 'Off' : methods.join(' + ');
+  return methods.isEmpty ? '꺼짐' : methods.join(' + ');
 }
 
 String _nameOrFallback(String value, String fallback) {
   final trimmed = value.trim();
-  return trimmed.isEmpty ? fallback : '$trimmed first';
+  return trimmed.isEmpty ? fallback : trimmed;
 }
 
 String _participantName(SessionConfig config, String id) {

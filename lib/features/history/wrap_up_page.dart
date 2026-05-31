@@ -26,6 +26,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
   List<SessionRecord> _savedRecords = const [];
   String? _statusMessage;
   bool _isBusy = false;
+  bool _showHistory = false;
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     setState(() {
       _isBusy = false;
       _savedRecords = records;
-      _statusMessage = 'Record saved on this device.';
+      _statusMessage = '이 기기에 기록을 저장했어요.';
     });
   }
 
@@ -90,7 +91,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     setState(() {
       _isBusy = false;
       _savedRecords = records;
-      _statusMessage = 'Record deleted.';
+      _statusMessage = '기록을 삭제했어요.';
     });
   }
 
@@ -106,13 +107,13 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     setState(() {
       _isBusy = false;
       _savedRecords = const [];
-      _statusMessage = 'All records deleted.';
+      _statusMessage = '모든 기록을 삭제했어요.';
     });
   }
 
   void _finishWithoutSaving() {
     setState(() {
-      _statusMessage = 'Record not saved.';
+      _statusMessage = '기록하지 않고 마쳤어요.';
     });
   }
 
@@ -120,13 +121,13 @@ final class _WrapUpPageState extends State<WrapUpPage> {
   Widget build(BuildContext context) {
     final record = widget.draftRecord;
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('Wrap-up')),
+      navigationBar: const CupertinoNavigationBar(middle: Text('마무리')),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
           children: [
             const Text(
-              'Session finished',
+              '대화가 끝났어요',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -135,11 +136,6 @@ final class _WrapUpPageState extends State<WrapUpPage> {
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '오늘의 대화 기록',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
             const Text('승패가 아니라, 다음 대화를 위한 기록입니다.'),
             const SizedBox(height: 18),
             _SummaryCard(record: record),
@@ -158,27 +154,38 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             const SizedBox(height: 14),
             CupertinoButton.filled(
               onPressed: _isBusy ? null : _saveRecord,
-              child: const Text('Save record'),
+              child: const Text('기록 저장'),
             ),
             const SizedBox(height: 10),
             CupertinoButton(
               onPressed: _finishWithoutSaving,
-              child: const Text('Finish without saving'),
+              child: const Text('저장하지 않고 마치기'),
             ),
             CupertinoButton(
               onPressed: widget.onStartAnotherSession,
-              child: const Text('Start another session'),
+              child: const Text('새 대화'),
             ),
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),
               _StatusLine(_statusMessage!),
             ],
-            const SizedBox(height: 22),
-            _HistorySection(
-              records: _savedRecords,
-              onDeleteRecord: _deleteRecord,
-              onClearRecords: _savedRecords.isEmpty ? null : _clearRecords,
+            const SizedBox(height: 16),
+            CupertinoButton(
+              onPressed: () {
+                setState(() {
+                  _showHistory = !_showHistory;
+                });
+              },
+              child: Text(_showHistory ? '저장된 기록 닫기' : '저장된 기록 보기'),
             ),
+            if (_showHistory) ...[
+              const SizedBox(height: 12),
+              _HistorySection(
+                records: _savedRecords,
+                onDeleteRecord: _deleteRecord,
+                onClearRecords: _savedRecords.isEmpty ? null : _clearRecords,
+              ),
+            ],
           ],
         ),
       ),
@@ -198,24 +205,21 @@ final class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Summary',
+            '요약',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
           _MetricGrid(
             metrics: [
-              _MetricData('Reason', record.endReason.label),
-              _MetricData('Duration', formatSeconds(record.durationSeconds)),
-              _MetricData('Breaks', record.breakCount.toString()),
+              _MetricData('종료', record.endReason.label),
+              _MetricData('대화 시간', formatSeconds(record.durationSeconds)),
+              _MetricData('휴식', record.breakCount.toString()),
+              _MetricData('휴식 시간', formatSeconds(record.totalBreakSeconds)),
               _MetricData(
-                'Break time',
-                formatSeconds(record.totalBreakSeconds),
-              ),
-              _MetricData(
-                'Turn limit',
+                '턴 제한',
                 formatSeconds(record.config.turnLimitSeconds),
               ),
-              _MetricData('Alerts', record.config.alertChannels),
+              _MetricData('알림', record.config.alertChannels),
             ],
           ),
         ],
@@ -242,17 +246,20 @@ final class _ParticipantResultCard extends StatelessWidget {
           const SizedBox(height: 12),
           _MetricGrid(
             metrics: [
-              _MetricData('Used', formatSeconds(participant.totalUsedSeconds)),
               _MetricData(
-                'Remaining',
+                '사용한 시간',
+                formatSeconds(participant.totalUsedSeconds),
+              ),
+              _MetricData(
+                '남은 시간',
                 formatSeconds(participant.totalRemainingSeconds),
               ),
-              _MetricData('Turns', participant.turnCount.toString()),
+              _MetricData('차례 수', participant.turnCount.toString()),
               _MetricData(
-                'Overtime total',
+                '오버타임 합계',
                 formatSeconds(participant.overtimeTotalSeconds),
               ),
-              _MetricData('Marks', participant.penaltyCount.toString()),
+              _MetricData('주의 표시', participant.penaltyCount.toString()),
             ],
           ),
         ],
@@ -277,24 +284,24 @@ final class _NotesSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Notes',
+            '메모',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
-          const _FieldLabel('Agreed together'),
+          const _FieldLabel('합의한 것'),
           CupertinoTextField(
             controller: agreedNotesController,
             minLines: 2,
             maxLines: 4,
-            placeholder: 'What did you agree on?',
+            placeholder: '함께 정한 내용을 적어두세요',
           ),
           const SizedBox(height: 12),
-          const _FieldLabel('Next topic'),
+          const _FieldLabel('다음에 이야기할 것'),
           CupertinoTextField(
             controller: nextTopicsController,
             minLines: 2,
             maxLines: 4,
-            placeholder: 'What should you discuss next?',
+            placeholder: '다음 대화로 넘길 주제를 적어두세요',
           ),
         ],
       ),
@@ -319,12 +326,12 @@ final class _HistorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Saved records',
+          '저장된 기록',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 10),
         if (records.isEmpty)
-          const _StatusLine('No saved records yet.')
+          const _StatusLine('저장된 기록이 아직 없어요.')
         else ...[
           ...records.map((record) {
             return Padding(
@@ -338,7 +345,7 @@ final class _HistorySection extends StatelessWidget {
           CupertinoButton(
             color: CupertinoColors.systemRed,
             onPressed: onClearRecords,
-            child: const Text('Delete all records'),
+            child: const Text('모든 기록 삭제'),
           ),
         ],
       ],
@@ -367,27 +374,27 @@ final class _SavedRecordCard extends StatelessWidget {
           const SizedBox(height: 10),
           _MetricGrid(
             metrics: [
-              _MetricData('Reason', record.endReason.label),
+              _MetricData('종료', record.endReason.label),
               _MetricData(
-                'Turn limit',
+                '턴 제한',
                 formatSeconds(record.config.turnLimitSeconds),
               ),
               _MetricData(
-                'Mark threshold',
+                '주의 표시 기준',
                 formatSeconds(record.config.overtimeThresholdSeconds),
               ),
-              _MetricData('Alerts', record.config.alertChannels),
-              _MetricData('Breaks', record.breakCount.toString()),
+              _MetricData('알림', record.config.alertChannels),
+              _MetricData('휴식', record.breakCount.toString()),
             ],
           ),
           if (record.agreedNotes != null) ...[
             const SizedBox(height: 10),
-            const _FieldLabel('Agreed together'),
+            const _FieldLabel('합의한 것'),
             Text(record.agreedNotes!),
           ],
           if (record.nextTopics != null) ...[
             const SizedBox(height: 10),
-            const _FieldLabel('Next topic'),
+            const _FieldLabel('다음에 이야기할 것'),
             Text(record.nextTopics!),
           ],
           const SizedBox(height: 12),
@@ -395,7 +402,7 @@ final class _SavedRecordCard extends StatelessWidget {
             color: CupertinoColors.systemRed,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             onPressed: onDelete,
-            child: const Text('Delete record'),
+            child: const Text('기록 삭제'),
           ),
         ],
       ),

@@ -1,4 +1,4 @@
-package com.example.calmturn
+package me.newlines.calmturn
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

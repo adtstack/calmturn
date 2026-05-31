@@ -31,7 +31,7 @@ final class CalmTurnApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
-      title: 'CalmTurn',
+      title: '말차례 CalmTurn',
       theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: Color(0xFF2D6A64),
@@ -111,7 +111,7 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
   Widget build(BuildContext context) {
     if (_isLoadingSettings) {
       return const CupertinoPageScaffold(
-        child: Center(child: Text('Loading settings')),
+        child: Center(child: Text('설정을 불러오는 중')),
       );
     }
 
@@ -481,7 +481,7 @@ final class _FaceTimerZone extends StatelessWidget {
     final turnTime = isOvertime
         ? showOvertime
               ? '+${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
-              : 'Time is up'
+              : '차례 시간이 끝났어요'
         : formatSeconds(snapshot.currentTurnRemainingSeconds);
     final primaryTime = isActive
         ? turnTime
@@ -509,7 +509,7 @@ final class _FaceTimerZone extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      isActive ? 'Now speaking' : 'Waiting turn',
+                      isActive ? '지금 말하는 중' : '듣는 시간',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: isActive
@@ -527,7 +527,7 @@ final class _FaceTimerZone extends StatelessWidget {
                               participant.name,
                               canResume: canResume,
                             )
-                          : '${participant.name} is listening',
+                          : '${participant.name}님은 듣는 중',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 30,
@@ -553,7 +553,7 @@ final class _FaceTimerZone extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _Metric(
-                            label: 'Total remaining',
+                            label: '전체 남은 시간',
                             value: formatSeconds(
                               participant.totalRemainingSeconds,
                             ),
@@ -563,49 +563,17 @@ final class _FaceTimerZone extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _Metric(
-                            label: isActive ? 'Turn remaining' : 'Current turn',
+                            label: isActive ? '이번 차례' : '대기 중',
                             value: isActive
                                 ? formatSeconds(
                                     snapshot.currentTurnRemainingSeconds,
                                   )
-                                : 'Not speaking',
-                            align: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _Metric(
-                            label: 'Used',
-                            value: formatSeconds(participant.totalUsedSeconds),
+                                : '듣는 중',
                             align: TextAlign.center,
                           ),
                         ),
                       ],
                     ),
-                    if (showOvertime) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _Metric(
-                              label: 'Overtime total',
-                              value: formatSeconds(
-                                participant.overtimeTotalSeconds,
-                              ),
-                              align: TextAlign.center,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _Metric(
-                              label: 'Marks',
-                              value: participant.penaltyCount.toString(),
-                              align: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                     if (isActive &&
                         showOvertime &&
                         (snapshot.phase == TimerPhase.runningOvertime ||
@@ -613,7 +581,7 @@ final class _FaceTimerZone extends StatelessWidget {
                       const SizedBox(height: 8),
                       Center(
                         child: _NoticeLine(
-                          'Overtime +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
+                          '오버타임 +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
                         ),
                       ),
                     ],
@@ -635,7 +603,7 @@ final class _FaceTimerZone extends StatelessWidget {
 
     return Semantics(
       button: onPassTurn != null,
-      label: '${participant.name} timer area',
+      label: '${participant.name} 타이머 영역',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onPassTurn,
@@ -741,7 +709,7 @@ final class _Controls extends StatelessWidget {
               child: CupertinoButton.filled(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: canPass ? onPassTurn : null,
-                child: const _ControlLabel('Pass turn'),
+                child: const _ControlLabel('차례 넘기기'),
               ),
             ),
             const SizedBox(width: 8),
@@ -751,9 +719,7 @@ final class _Controls extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: canBreak ? onBreakOrResume : null,
                 child: Text(
-                  isPaused
-                      ? (canResume ? 'Resume' : 'Turn ended')
-                      : 'Take break',
+                  isPaused ? (canResume ? '이어서 하기' : '차례 끝') : '잠깐 쉬기',
                   maxLines: 1,
                   style: const TextStyle(color: CupertinoColors.white),
                 ),
@@ -765,14 +731,14 @@ final class _Controls extends StatelessWidget {
                 color: const Color(0xFF775A2C),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: isFinished ? null : onFinish,
-                child: const _ControlLabel('End session'),
+                child: const _ControlLabel('오늘은 여기까지'),
               ),
             ),
           ],
         ),
         if (isAutoPaused) ...[
           const SizedBox(height: 8),
-          const _NoticeLine('Pass turn to continue.'),
+          const _NoticeLine('차례를 넘기면 이어집니다.'),
         ],
         if (phase == TimerPhase.needsExtension) ...[
           const SizedBox(height: 8),
@@ -780,7 +746,7 @@ final class _Controls extends StatelessWidget {
             color: const Color(0xFF2D6A64),
             padding: const EdgeInsets.symmetric(vertical: 12),
             onPressed: onAddMinute,
-            child: const _ControlLabel('Add 1 minute'),
+            child: const _ControlLabel('1분 더하기'),
           ),
         ],
         if (isFinished) ...[
@@ -788,7 +754,7 @@ final class _Controls extends StatelessWidget {
           CupertinoButton(
             padding: const EdgeInsets.symmetric(vertical: 12),
             onPressed: onRestart,
-            child: const Text('Restart session'),
+            child: const Text('새 대화 시작'),
           ),
         ],
       ],
@@ -869,9 +835,9 @@ String _headline(
   required bool canResume,
 }) {
   return switch (phase) {
-    TimerPhase.paused => canResume ? 'Taking a break' : 'Turn limit reached',
-    TimerPhase.needsExtension => '$activeName needs more time',
-    TimerPhase.finished => 'Session finished',
-    _ => '$activeName is speaking',
+    TimerPhase.paused => canResume ? '잠깐 쉬는 중' : '차례가 끝났어요',
+    TimerPhase.needsExtension => '$activeName님의 전체 시간이 끝났어요',
+    TimerPhase.finished => '대화가 끝났어요',
+    _ => '$activeName님 차례',
   };
 }
