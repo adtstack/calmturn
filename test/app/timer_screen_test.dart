@@ -158,6 +158,50 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('active timer semantics expose overtime and penalty state', (
+    tester,
+  ) async {
+    await _pumpTimer(
+      tester,
+      _config(penaltyConfig: const PenaltyConfig(thresholdSeconds: 5)),
+    );
+
+    await tester.pump(const Duration(seconds: 65));
+    await tester.pump();
+
+    expect(
+      find.bySemanticsLabel(RegExp('A 타이머 영역.*말하는 중.*오버타임 0:05.*주의 표시 1회')),
+      findsOneWidget,
+    );
+
+    await _tapText(tester, '오늘은 여기까지');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('small screen with large text keeps core timer state visible', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(
+      tester,
+      _config(penaltyConfig: const PenaltyConfig(thresholdSeconds: 5)),
+      textScaleFactor: 2,
+    );
+    await tester.pump(const Duration(seconds: 65));
+    await tester.pump();
+
+    expect(find.text('A님 차례'), findsOneWidget);
+    expect(find.text('+0:05'), findsOneWidget);
+    expect(find.text('오버타임 +0:05'), findsOneWidget);
+    expect(find.textContaining('주의 표시 1회 기록'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await _tapText(tester, '오늘은 여기까지');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('hidden overtime setting suppresses explicit overtime counters', (
     tester,
   ) async {
@@ -212,7 +256,11 @@ void main() {
   });
 }
 
-Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
+Future<void> _pumpTimer(
+  WidgetTester tester,
+  SessionConfig config, {
+  double textScaleFactor = 1,
+}) async {
   await tester.pumpWidget(
     CupertinoApp(
       theme: const CupertinoThemeData(
@@ -220,7 +268,16 @@ Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
         primaryColor: Color(0xFF2D6A64),
         scaffoldBackgroundColor: Color(0xFFF6F4EF),
       ),
-      home: TimerHomePage(config: config),
+      home: Builder(
+        builder: (context) {
+          return MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScaleFactor)),
+            child: TimerHomePage(config: config),
+          );
+        },
+      ),
     ),
   );
   await tester.pump();

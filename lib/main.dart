@@ -603,7 +603,13 @@ final class _FaceTimerZone extends StatelessWidget {
 
     return Semantics(
       button: onPassTurn != null,
-      label: '${participant.name} 타이머 영역',
+      label: _timerSemanticsLabel(
+        participant: participant,
+        snapshot: snapshot,
+        isActive: isActive,
+        showOvertime: showOvertime,
+        canResume: canResume,
+      ),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onPassTurn,
@@ -631,6 +637,30 @@ Color _zoneColor(bool isActive, bool needsTurnLimitTone) {
     return const Color(0xFFFFF0CC);
   }
   return isActive ? const Color(0xFFE7F1EC) : const Color(0xFFF8F6F0);
+}
+
+String _timerSemanticsLabel({
+  required Participant participant,
+  required TimerSnapshot snapshot,
+  required bool isActive,
+  required bool showOvertime,
+  required bool canResume,
+}) {
+  final parts = <String>[
+    '${participant.name} 타이머 영역',
+    isActive ? '말하는 중' : '듣는 중',
+    if (isActive)
+      _headline(snapshot.phase, participant.name, canResume: canResume),
+    if (isActive && snapshot.phase == TimerPhase.runningOvertime)
+      showOvertime
+          ? '오버타임 ${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
+          : '차례 시간이 끝남',
+    '전체 남은 시간 ${formatSeconds(participant.totalRemainingSeconds)}',
+    if (isActive)
+      '이번 차례 ${formatSeconds(snapshot.currentTurnRemainingSeconds)}',
+    if (participant.penaltyCount > 0) '주의 표시 ${participant.penaltyCount}회',
+  ];
+  return parts.join(', ');
 }
 
 final class _Metric extends StatelessWidget {
@@ -718,10 +748,8 @@ final class _Controls extends StatelessWidget {
                 color: const Color(0xFF1C2523),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 onPressed: canBreak ? onBreakOrResume : null,
-                child: Text(
+                child: _ControlLabel(
                   isPaused ? (canResume ? '이어서 하기' : '차례 끝') : '잠깐 쉬기',
-                  maxLines: 1,
-                  style: const TextStyle(color: CupertinoColors.white),
                 ),
               ),
             ),
