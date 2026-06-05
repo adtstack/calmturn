@@ -58,7 +58,7 @@
 - 스크린샷 준비
 
 ## 5. 개인정보 제출 준비
-MVP가 로컬 저장만 한다면 개인정보 설명이 단순해진다. 그래도 Play Console Data safety에는 앱과 서드파티 SDK가 수집하는 데이터를 정확히 입력해야 한다.
+MVP가 로컬 저장만 한다면 개인정보 설명이 단순해진다. 그래도 Play Console 데이터 보안 항목에는 앱과 서드파티 SDK가 수집하는 데이터를 정확히 입력해야 한다.
 
 확인할 것:
 - 분석 SDK를 넣었는가?
@@ -147,12 +147,19 @@ Google Play 내부 테스트 또는 직접 APK 설치 테스트에서는 다음�
 - [x] 기본 흰색/템플릿 런치 화면을 제품 톤에 맞는 Splash screen으로 교체한다.
 - [x] Release 빌드에서 debug signing을 제거하고 `android/key.properties` 기반 release signing config를 추가한다.
   - 실제 업로드 전에는 release keystore를 생성하고 `android/key.properties`를 로컬에 준비한다.
-- [ ] `versionCode`와 `versionName` 증가 규칙을 정한다.
+- [x] `versionCode`와 `versionName` 증가 규칙을 정한다.
+  - 기준: `pubspec.yaml`의 `version`을 Android 릴리스 버전의 단일 출처로 사용한다.
+  - 현재값: `0.1.0+1`.
+  - `versionName`은 `pubspec.yaml`의 `version`에서 `+` 앞의 SemVer(`0.1.0`)를 전달한다.
+  - `versionCode`는 `pubspec.yaml`의 `version`에서 `+` 뒤의 빌드 번호(`1`)를 전달한다.
+  - 증가 규칙: Play에 새 Android 빌드를 올릴 때마다 `+` 뒤 빌드 번호는 반드시 이전 업로드보다 크게 올리고, 사용자에게 보이는 앱 버전이 바뀔 때만 `+` 앞 SemVer를 올린다.
+  - Gradle 설정은 `android/app/build.gradle.kts`에서 `versionCode = flutter.versionCode`, `versionName = flutter.versionName` 흐름을 유지한다.
+  - 검증: `flutter test test/release_identity_test.dart`로 pubspec 버전 형식, Gradle 전달 설정, 이 체크리스트 문구가 일치하는지 확인한다.
 - [ ] `minSdk`와 `targetSdk`가 Google Play 요구사항과 실제 테스트 기기 범위에 맞는지 확인한다.
 - [ ] Android SDK `cmdline-tools`가 설치되어 있고 `flutter doctor`에서 Android toolchain이 통과하는지 확인한다.
 - [ ] Android SDK 라이선스가 모두 수락되어 있는지 확인한다.
 - [ ] 진동, 소리, 화면 알림을 실제 Android 기기에서 확인한다.
 - [ ] 권한 목록을 점검하고 불필요한 권한이 추가되지 않았는지 확인한다.
 - [ ] 개인정보 처리방침 URL과 지원 URL을 준비한다.
-- [ ] Google Play Data safety 답변을 MVP 원칙에 맞게 작성한다.
+- [ ] Google Play 데이터 보안 답변을 MVP 원칙에 맞게 작성한다.
 - [ ] 내부 테스트 트랙에 AAB를 올리기 전에 APK 직접 설치 테스트를 먼저 수행한다.

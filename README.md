@@ -62,9 +62,100 @@ v2까지의 핵심은 “공평한 전체 시간 + 턴당 제한 + 번갈아 말
 5. `09_vibe_coding_prompts.md`의 Prompt 0부터 순서대로 개발합니다.
 6. Android 내부 테스트 전에는 `07_safety_privacy.md`와 `08_android_launch_checklist.md`를 다시 확인합니다.
 
+## 출시 전 전략
+현재 목표는 기능을 더 늘리는 것이 아니라, `말차례 CalmTurn`을 Google Play 내부 테스트에 올릴 수 있는 **서명된 Android 후보**로 만드는 것입니다. 첫 출시는 “대화 시간을 나누는 로컬 타이머”에 집중하고, 음성 감지, 녹음, AI 요약, 클라우드 동기화 같은 민감한 기능은 출시 이후 별도 검토 대상으로 둡니다.
+
+### 현재 검증된 것
+- `./tool/check.sh`는 통과했습니다.
+- `flutter test test/release_identity_test.dart`는 통과했습니다.
+- `flutter build appbundle --release --no-pub`로 `build/app/outputs/bundle/release/app-release.aab`가 생성됐습니다.
+- Android 도구 체인은 `flutter doctor -v` 기준으로 통과했고, Android SDK 라이선스도 수락된 상태입니다.
+- 릴리스 매니페스트에는 불필요한 권한이 보이지 않습니다. `INTERNET` 권한은 debug/profile 매니페스트에만 있습니다.
+- 16KB 페이지 크기 대응을 위한 AAB 정렬 검사는 통과했습니다.
+
+### 출시 전 부족한 점
+1. **서명된 릴리스 산출물이 없습니다.**
+   - 현재 생성된 AAB는 빌드는 되지만 서명되지 않았습니다.
+   - `android/key.properties`와 업로드 키 저장소를 준비해야 합니다.
+   - Play에 올릴 후보는 서명 검증까지 통과해야 합니다.
+
+2. **실제 Android 기기 검증 증거가 없습니다.**
+   - 현재 연결된 Android 기기가 없습니다.
+   - 진동, 소리, 설치, 큰 글씨, TalkBack, 앱 재시작 후 저장 상태는 실제 기기에서 확인해야 합니다.
+
+3. **출시 정책 자료가 아직 없습니다.**
+   - 공개 개인정보 처리방침 URL이 필요합니다.
+   - 지원 URL이 필요합니다.
+   - Google Play 데이터 보안 답변이 필요합니다.
+   - 스토어 설명, 짧은 설명, 스크린샷 문구가 필요합니다.
+
+4. **앱 설정 저장 범위가 불명확합니다.**
+   - 현재 설정 화면은 “설정 저장”을 보여주지만, 저장소는 주로 세션 규칙 중심입니다.
+   - `자동 저장` 같은 앱 설정이 앱 재시작 후에도 유지되는지 테스트와 구현을 맞춰야 합니다.
+
+5. **출시 정체성 검증이 기본 검증 스크립트에 포함되어 있지 않습니다.**
+   - `test/release_identity_test.dart`는 통과하지만 `tool/check.sh`에는 아직 포함되어 있지 않습니다.
+   - 앱 이름, 패키지명, 아이콘, 스플래시, 버전 규칙은 기본 검증에서 함께 막아야 합니다.
+
+6. **파괴적 작업에 확인 절차가 부족합니다.**
+   - 기록 삭제, 모든 기록 삭제는 실수 비용이 큽니다.
+   - 출시 전 확인 대화상자와 회귀 테스트를 추가해야 합니다.
+
+### 실행 순서
+1. **검증 자동화 보강**
+   - `tool/check.sh`에 `flutter test test/release_identity_test.dart`를 추가합니다.
+   - 릴리스 전용 검사 스크립트를 만들어 테스트, AAB 빌드, 16KB 정렬, 서명 검증을 한 번에 확인합니다.
+
+2. **Android 서명 준비**
+   - `.gitignore`에 `android/key.properties`, `*.jks`, `*.keystore`를 추가합니다.
+   - `android/key.properties.example`만 저장소에 둡니다.
+   - 실제 업로드 키는 로컬 안전 경로에 만들고 Git에 올리지 않습니다.
+   - 서명된 AAB가 만들어진 뒤에만 Play 업로드 후보로 봅니다.
+
+3. **정책 문서 준비**
+   - 개인정보 처리방침을 한국어로 작성하고 공개 URL로 배포합니다.
+   - 지원 페이지를 한국어로 작성하고 공개 URL로 배포합니다.
+   - Google Play 데이터 보안 답변을 현재 최소 기능 제품 기준으로 정리합니다.
+   - 앱이 마이크, 녹음, 위치, 연락처, 광고 추적, 서버 전송을 하지 않는다는 점을 문서와 앱 안에서 일관되게 유지합니다.
+
+4. **앱 내부 출시 UX 보강**
+   - 앱 설정 전체를 저장하도록 저장 모델을 정리합니다.
+   - 기록 삭제와 모든 기록 삭제에 확인 대화상자를 추가합니다.
+   - 설정 화면에 “기록은 이 기기에만 저장됨”, “마이크와 녹음 없음”, “앱은 누가 맞는지 판단하지 않음”을 표시합니다.
+   - 규칙 확인 화면에도 버튼 기준 기록과 판단하지 않는다는 안내를 추가합니다.
+
+5. **실제 기기 테스트**
+   - 서명된 APK 또는 Play 내부 테스트 빌드를 실제 Android 기기에 설치합니다.
+   - 첫 실행, 규칙 동의, 타이머, 차례 넘기기, 휴식/재개, 종료, 기록 저장/삭제를 확인합니다.
+   - 소리와 진동을 실제 기기에서 확인합니다.
+   - 큰 글씨와 TalkBack에서 핵심 상태가 읽히는지 확인합니다.
+
+6. **Google Play 내부 테스트**
+   - 패키지명 `me.newlines.calmturn`과 앱 이름 `말차례 CalmTurn`을 최종 확인합니다.
+   - Play 앱 서명을 사용합니다.
+   - 서명된 AAB를 내부 테스트 트랙에 올립니다.
+   - Play가 표시하는 대상 API, 16KB 페이지 크기, 개인정보, 데이터 보안, 스토어 등록정보 경고를 모두 해소합니다.
+
+7. **출시 판단**
+   - 내부 테스트 설치까지 통과하면 “내부 테스트 준비 완료”로 봅니다.
+   - 실제 사용자 피드백을 반영한 뒤 닫힌 테스트 또는 프로덕션 제출 여부를 결정합니다.
+   - 프로덕션 제출은 서명, 정책 URL, 데이터 보안, 스크린샷, 실제 기기 검증, Play 경고 해소가 모두 끝난 뒤에만 진행합니다.
+
+### 출시 전 최종 명령
+아래 명령이 통과해야 내부 테스트 후보로 볼 수 있습니다.
+
+```bash
+./tool/check.sh
+flutter test test/release_identity_test.dart
+flutter build appbundle --release --no-pub
+git diff --check
+```
+
+서명 준비가 끝난 뒤에는 AAB 서명 검증도 반드시 통과해야 합니다.
+
 ## 공식 참고 자료
 - Flutter Android 배포 문서: https://docs.flutter.dev/deployment/android
 - Flutter Material widgets: https://docs.flutter.dev/ui/widgets/material
 - Android 앱 빌드 문서: https://developer.android.com/studio/run
 - Google Play Console 도움말: https://support.google.com/googleplay/android-developer
-- Google Play Data safety: https://support.google.com/googleplay/android-developer/answer/10787469
+- Google Play 데이터 보안: https://support.google.com/googleplay/android-developer/answer/10787469

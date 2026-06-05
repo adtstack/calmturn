@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../settings/session_setup_page.dart';
+import 'history_screen.dart';
 import 'session_record.dart';
 import 'session_record_store.dart';
 
@@ -23,10 +24,8 @@ final class WrapUpPage extends StatefulWidget {
 final class _WrapUpPageState extends State<WrapUpPage> {
   late final TextEditingController _agreedNotesController;
   late final TextEditingController _nextTopicsController;
-  List<SessionRecord> _savedRecords = const [];
   String? _statusMessage;
   bool _isBusy = false;
-  bool _showHistory = false;
 
   @override
   void initState() {
@@ -37,7 +36,6 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     _nextTopicsController = TextEditingController(
       text: widget.draftRecord.nextTopics,
     );
-    _loadRecords();
   }
 
   @override
@@ -45,16 +43,6 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     _agreedNotesController.dispose();
     _nextTopicsController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadRecords() async {
-    final records = await widget.recordStore.load();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _savedRecords = records;
-    });
   }
 
   Future<void> _saveRecord() async {
@@ -67,47 +55,12 @@ final class _WrapUpPageState extends State<WrapUpPage> {
       nextTopics: _nextTopicsController.text,
     );
     await widget.recordStore.save(record);
-    final records = await widget.recordStore.load();
     if (!mounted) {
       return;
     }
     setState(() {
       _isBusy = false;
-      _savedRecords = records;
       _statusMessage = '이 기기에 기록을 저장했어요.';
-    });
-  }
-
-  Future<void> _deleteRecord(String id) async {
-    setState(() {
-      _isBusy = true;
-      _statusMessage = null;
-    });
-    await widget.recordStore.delete(id);
-    final records = await widget.recordStore.load();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isBusy = false;
-      _savedRecords = records;
-      _statusMessage = '기록을 삭제했어요.';
-    });
-  }
-
-  Future<void> _clearRecords() async {
-    setState(() {
-      _isBusy = true;
-      _statusMessage = null;
-    });
-    await widget.recordStore.clear();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isBusy = false;
-      _savedRecords = const [];
-      _statusMessage = '모든 기록을 삭제했어요.';
     });
   }
 
@@ -115,6 +68,16 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     setState(() {
       _statusMessage = '기록하지 않고 마쳤어요.';
     });
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) {
+          return HistoryScreen(recordStore: widget.recordStore);
+        },
+      ),
+    );
   }
 
   @override
@@ -171,21 +134,9 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             ],
             const SizedBox(height: 16),
             CupertinoButton(
-              onPressed: () {
-                setState(() {
-                  _showHistory = !_showHistory;
-                });
-              },
-              child: Text(_showHistory ? '저장된 기록 닫기' : '저장된 기록 보기'),
+              onPressed: _openHistory,
+              child: const Text('저장된 기록 보기'),
             ),
-            if (_showHistory) ...[
-              const SizedBox(height: 12),
-              _HistorySection(
-                records: _savedRecords,
-                onDeleteRecord: _deleteRecord,
-                onClearRecords: _savedRecords.isEmpty ? null : _clearRecords,
-              ),
-            ],
           ],
         ),
       ),
@@ -309,107 +260,6 @@ final class _NotesSection extends StatelessWidget {
   }
 }
 
-final class _HistorySection extends StatelessWidget {
-  final List<SessionRecord> records;
-  final ValueChanged<String> onDeleteRecord;
-  final VoidCallback? onClearRecords;
-
-  const _HistorySection({
-    required this.records,
-    required this.onDeleteRecord,
-    required this.onClearRecords,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '저장된 기록',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        if (records.isEmpty)
-          const _StatusLine('저장된 기록이 아직 없어요.')
-        else ...[
-          ...records.map((record) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _SavedRecordCard(
-                record: record,
-                onDelete: () => onDeleteRecord(record.id),
-              ),
-            );
-          }),
-          CupertinoButton(
-            color: CupertinoColors.systemRed,
-            onPressed: onClearRecords,
-            child: const Text('모든 기록 삭제'),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-final class _SavedRecordCard extends StatelessWidget {
-  final SessionRecord record;
-  final VoidCallback onDelete;
-
-  const _SavedRecordCard({required this.record, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            record.title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(_formatDateTime(record.startedAt)),
-          const SizedBox(height: 10),
-          _MetricGrid(
-            metrics: [
-              _MetricData('종료', record.endReason.label),
-              _MetricData(
-                '턴 제한',
-                formatSeconds(record.config.turnLimitSeconds),
-              ),
-              _MetricData(
-                '주의 표시 기준',
-                formatSeconds(record.config.overtimeThresholdSeconds),
-              ),
-              _MetricData('알림', record.config.alertChannels),
-              _MetricData('휴식', record.breakCount.toString()),
-            ],
-          ),
-          if (record.agreedNotes != null) ...[
-            const SizedBox(height: 10),
-            const _FieldLabel('합의한 것'),
-            Text(record.agreedNotes!),
-          ],
-          if (record.nextTopics != null) ...[
-            const SizedBox(height: 10),
-            const _FieldLabel('다음에 이야기할 것'),
-            Text(record.nextTopics!),
-          ],
-          const SizedBox(height: 12),
-          CupertinoButton(
-            color: CupertinoColors.systemRed,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            onPressed: onDelete,
-            child: const Text('기록 삭제'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 final class _Card extends StatelessWidget {
   final Widget child;
 
@@ -513,14 +363,4 @@ final class _StatusLine extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatDateTime(DateTime value) {
-  final local = value.toLocal();
-  return '${local.year}-${_two(local.month)}-${_two(local.day)} '
-      '${_two(local.hour)}:${_two(local.minute)}';
-}
-
-String _two(int value) {
-  return value.toString().padLeft(2, '0');
 }

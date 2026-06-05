@@ -33,6 +33,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = maxOf(flutter.targetSdkVersion, 35)
+        // Release version source of truth: pubspec.yaml version: x.y.z+build.
+        // Flutter maps x.y.z to Android versionName and build to versionCode.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

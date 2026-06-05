@@ -2,6 +2,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+final _pubspecVersionPattern = RegExp(
+  r'^version:\s+(\d+\.\d+\.\d+)\+(\d+)\s*$',
+  multiLine: true,
+);
+
 void main() {
   test('Android and web identity use the release Korean brand', () {
     final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
@@ -47,5 +52,40 @@ void main() {
     expect(icon, contains('#2D6A64'));
     expect(icon, contains('#D99C2B'));
     expect(launchBackground, contains('@drawable/ic_turn_ring_launcher'));
+  });
+
+  test('Android version metadata is delegated to pubspec version plus build', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
+    final checklist = File(
+      'docs/08_android_launch_checklist.md',
+    ).readAsStringSync();
+    final versionMatch = _pubspecVersionPattern.firstMatch(pubspec);
+
+    expect(versionMatch, isNotNull);
+    final versionName = versionMatch!.group(1)!;
+    final versionCode = versionMatch.group(2)!;
+
+    expect(int.parse(versionCode), greaterThanOrEqualTo(1));
+    expect(buildGradle, contains('versionCode = flutter.versionCode'));
+    expect(buildGradle, contains('versionName = flutter.versionName'));
+    expect(buildGradle, contains('pubspec.yaml version: x.y.z+build'));
+    expect(checklist, contains('현재값: `$versionName+$versionCode`.'));
+    expect(
+      checklist,
+      contains(
+        '`versionName`은 `pubspec.yaml`의 `version`에서 `+` 앞의 SemVer(`$versionName`)',
+      ),
+    );
+    expect(
+      checklist,
+      contains(
+        '`versionCode`는 `pubspec.yaml`의 `version`에서 `+` 뒤의 빌드 번호(`$versionCode`)',
+      ),
+    );
+    expect(
+      checklist,
+      contains('검증: `flutter test test/release_identity_test.dart`'),
+    );
   });
 }

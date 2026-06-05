@@ -74,6 +74,35 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('active speaker zone has stronger contrast than listener zone', (
+    tester,
+  ) async {
+    await _pumpTimer(tester, _config());
+
+    expect(
+      _zoneBackground(tester, const ValueKey('face-timer-bottom-zone')),
+      const Color(0xFFBEDDD2),
+    );
+    expect(
+      _zoneBackground(tester, const ValueKey('face-timer-top-zone')),
+      const Color(0xFFF8F6F0),
+    );
+
+    await _tapText(tester, '차례 넘기기');
+
+    expect(
+      _zoneBackground(tester, const ValueKey('face-timer-top-zone')),
+      const Color(0xFFBEDDD2),
+    );
+    expect(
+      _zoneBackground(tester, const ValueKey('face-timer-bottom-zone')),
+      const Color(0xFFF8F6F0),
+    );
+
+    await _tapText(tester, '오늘은 여기까지');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('center controls keep labels readable on colored buttons', (
     tester,
   ) async {
@@ -291,6 +320,14 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   }
   await tester.tap(finder);
   await tester.pump();
+}
+
+Color _zoneBackground(WidgetTester tester, ValueKey<String> key) {
+  final decoratedBox = tester.widget<DecoratedBox>(
+    find.descendant(of: find.byKey(key), matching: find.byType(DecoratedBox)),
+  );
+  final decoration = decoratedBox.decoration as BoxDecoration;
+  return decoration.color!;
 }
 
 SessionConfig _config({

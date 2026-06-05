@@ -1,10 +1,60 @@
+import 'package:calmturn/features/history/session_record.dart';
 import 'package:calmturn/features/history/session_record_store.dart';
+import 'package:calmturn/features/settings/app_settings.dart';
+import 'package:calmturn/features/timer/domain/timer_engine.dart';
 import 'package:calmturn/features/timer/domain/timer_models.dart';
 import 'package:calmturn/main.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('setup opens saved records and drills into details', (
+    tester,
+  ) async {
+    final settingsStore = JsonAppSettingsStore(
+      storage: InMemoryAppSettingsStorage(),
+    );
+    final recordStore = JsonSessionRecordStore(
+      storage: InMemorySessionRecordStorage(),
+    );
+    await recordStore.save(
+      _record(
+        'record-1',
+        DateTime(2026, 5, 15, 9),
+        agreedNotes: '예시는 짧게 말하기.',
+        nextTopics: '예산 이야기는 다음에 이어가기.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      CalmTurnApp(settingsStore: settingsStore, recordStore: recordStore),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('대화 규칙'), findsOneWidget);
+    await _tapText(tester, '저장된 기록 보기');
+
+    expect(find.text('저장된 기록'), findsOneWidget);
+    expect(find.text('A / B'), findsOneWidget);
+    expect(find.text('예시는 짧게 말하기.'), findsNothing);
+
+    await _tapText(tester, 'A / B');
+
+    expect(find.text('기록 자세히'), findsOneWidget);
+    await _ensureTextVisible(tester, '합의한 것');
+    expect(find.text('합의한 것'), findsOneWidget);
+    expect(find.text('예시는 짧게 말하기.'), findsOneWidget);
+    expect(find.text('다음에 이야기할 것'), findsOneWidget);
+    expect(find.text('예산 이야기는 다음에 이어가기.'), findsOneWidget);
+
+    await _tapText(tester, '기록 삭제');
+    expect(find.text('저장된 기록이 아직 없어요.'), findsOneWidget);
+    expect(await recordStore.load(), isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('wrap-up shows neutral conversation record and saved history', (
     tester,
   ) async {
@@ -48,21 +98,33 @@ void main() {
     await _tapText(tester, '저장된 기록 보기');
     expect(find.text('저장된 기록'), findsOneWidget);
     expect(find.text('A / B'), findsOneWidget);
-    expect(find.text('예시는 짧게 말하기.'), findsWidgets);
-    expect(find.text('예산 이야기는 다음에 이어가기.'), findsWidgets);
+    expect(find.text('예시는 짧게 말하기.'), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.text('기록 삭제').last,
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
+    await _tapText(tester, 'A / B');
+    expect(find.text('기록 자세히'), findsOneWidget);
+    await _ensureTextVisible(tester, '예시는 짧게 말하기.');
+    expect(find.text('예시는 짧게 말하기.'), findsOneWidget);
+    expect(find.text('예산 이야기는 다음에 이어가기.'), findsOneWidget);
+
     await _tapText(tester, '기록 삭제');
     expect(find.text('저장된 기록이 아직 없어요.'), findsOneWidget);
     expect(await store.load(), isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
+}
+
+Future<void> _ensureTextVisible(WidgetTester tester, String text) async {
+  final textFinder = find.text(text);
+  if (textFinder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      textFinder,
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+  }
+  await tester.ensureVisible(textFinder.last);
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpTimer(
@@ -116,5 +178,25 @@ SessionConfig _config() {
     overtimeConfig: const OvertimeConfig(),
     penaltyConfig: const PenaltyConfig(thresholdSeconds: 5),
     alertConfig: const AlertConfig(),
+  );
+}
+
+SessionRecord _record(
+  String id,
+  DateTime startedAt, {
+  String? agreedNotes,
+  String? nextTopics,
+}) {
+  final config = _config();
+  return SessionRecord.fromTimerSnapshot(
+    id: id,
+    config: config,
+    snapshot: TimerEngine.start(config).snapshot(),
+    startedAt: startedAt,
+    endedAt: startedAt.add(const Duration(minutes: 5)),
+    endReason: SessionEndReason.endedByUser,
+    breakCount: 0,
+    agreedNotes: agreedNotes,
+    nextTopics: nextTopics,
   );
 }

@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 
 import 'features/history/session_record.dart';
 import 'features/history/session_record_store.dart';
+import 'features/history/history_screen.dart';
 import 'features/history/wrap_up_page.dart';
 import 'features/settings/app_settings.dart';
 import 'features/settings/app_settings_platform_storage_stub.dart'
@@ -107,6 +108,16 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
     });
   }
 
+  void _openHistory() {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) {
+          return HistoryScreen(recordStore: _recordStore);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingSettings) {
@@ -141,6 +152,7 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
             _isEditingAppSettings = true;
           });
         },
+        onOpenHistory: _openHistory,
         onSessionAccepted: (acceptedConfig) {
           unawaited(_acceptSession(acceptedConfig));
         },
@@ -636,7 +648,7 @@ Color _zoneColor(bool isActive, bool needsTurnLimitTone) {
   if (needsTurnLimitTone) {
     return const Color(0xFFFFF0CC);
   }
-  return isActive ? const Color(0xFFE7F1EC) : const Color(0xFFF8F6F0);
+  return isActive ? const Color(0xFFBEDDD2) : const Color(0xFFF8F6F0);
 }
 
 String _timerSemanticsLabel({

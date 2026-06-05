@@ -38,12 +38,14 @@ final class SessionSetupPage extends StatefulWidget {
   final ValueChanged<SessionConfig> onSessionAccepted;
   final SessionSettingsDraft initialDraft;
   final VoidCallback? onOpenAppSettings;
+  final VoidCallback? onOpenHistory;
 
   SessionSetupPage({
     super.key,
     required this.onSessionAccepted,
     SessionSettingsDraft? initialDraft,
     this.onOpenAppSettings,
+    this.onOpenHistory,
   }) : initialDraft = initialDraft ?? SessionSettingsDraft.defaults();
 
   @override
@@ -119,6 +121,17 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
+            if (widget.onOpenHistory != null) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: widget.onOpenHistory,
+                  child: const Text('저장된 기록 보기'),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             _Section(
               title: '참가자',
               children: [
