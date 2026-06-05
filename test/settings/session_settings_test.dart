@@ -52,6 +52,99 @@ void main() {
         config.overtimeConfig.behavior,
         TurnLimitBehavior.autoPause,
       );
+      _expectEquals(config.penaltyConfig.enabled, false);
+      _expectEquals(config.alertConfig.overtimeStartAlertEnabled, false);
+      _expectEquals(config.alertConfig.penaltyAlertEnabled, false);
+    },
+    'validates turn limits that are longer than the shortest total': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          sharedTotalSeconds: 180,
+          turnLimitSeconds: 300,
+        ),
+      );
+
+      _expectEquals(message, invalidTurnLimitMessage);
+    },
+    'validates penalty thresholds that can never be reached': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          sharedTotalSeconds: 180,
+          turnLimitSeconds: 60,
+          penaltyThresholdSeconds: 180,
+        ),
+      );
+
+      _expectEquals(message, invalidPenaltyThresholdMessage);
+    },
+    'validates overtime settings with no possible overtime window': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          sharedTotalSeconds: 180,
+          turnLimitSeconds: 180,
+        ),
+      );
+
+      _expectEquals(message, invalidOvertimeWindowMessage);
+    },
+    'validates warning moments that are not before a limit': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          turnLimitSeconds: 60,
+          warningBeforeSeconds: 60,
+        ),
+      );
+
+      _expectEquals(message, invalidWarningBeforeMessage);
+    },
+    'validates alert targets without delivery methods': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          visualEnabled: false,
+          soundEnabled: false,
+          hapticEnabled: false,
+        ),
+      );
+
+      _expectEquals(message, invalidAlertDeliveryMessage);
+    },
+    'validates delivery methods without alert targets': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          turnWarningEnabled: false,
+          totalWarningEnabled: false,
+          overtimeStartAlertEnabled: false,
+          penaltyAlertEnabled: false,
+          visualEnabled: true,
+          soundEnabled: false,
+          hapticEnabled: false,
+        ),
+      );
+
+      _expectEquals(message, invalidAlertTargetMessage);
+    },
+    'validates saved configs with invalid speaker ids': () {
+      final message = validateSessionConfig(
+        const SessionConfig(
+          participantA: ParticipantConfig(
+            id: 'a',
+            name: 'A',
+            totalAllocatedSeconds: 300,
+          ),
+          participantB: ParticipantConfig(
+            id: 'b',
+            name: 'B',
+            totalAllocatedSeconds: 300,
+          ),
+          turnLimitSeconds: 60,
+          firstSpeakerId: 'missing',
+          overtimeConfig: OvertimeConfig(),
+          penaltyConfig: PenaltyConfig(),
+          alertConfig: AlertConfig(),
+        ),
+      );
+
+      _expectEquals(message, invalidSessionConfigMessage);
     },
   };
 

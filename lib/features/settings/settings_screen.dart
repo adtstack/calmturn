@@ -28,6 +28,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   late AppSettingsDraft _settings;
   bool _isBusy = false;
   String? _statusMessage;
+  String? _validationMessage;
 
   SessionSettingsDraft get _draft => _settings.sessionDefaults;
 
@@ -77,43 +78,43 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 14),
                 if (_draft.totalTimeMode == TotalTimeMode.same)
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.sharedTotalSeconds,
-                    options: const [
-                      ChoiceOption('각자 3분', 180),
-                      ChoiceOption('각자 5분', 300),
-                      ChoiceOption('각자 10분', 600),
-                      ChoiceOption('각자 15분', 900),
-                    ],
-                    onSelected: (value) {
+                    options: sharedTotalMinuteOptions,
+                    inputKey: 'shared-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(_draft.copyWith(sharedTotalSeconds: value));
                     },
                   )
                 else ...[
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.participantATotalSeconds,
-                    options: const [
-                      ChoiceOption('A 3분', 180),
-                      ChoiceOption('A 5분', 300),
-                      ChoiceOption('A 7분', 420),
-                      ChoiceOption('A 10분', 600),
-                    ],
-                    onSelected: (value) {
+                    options: participantATotalMinuteOptions,
+                    inputKey: 'participant-a-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(
                         _draft.copyWith(participantATotalSeconds: value),
                       );
                     },
                   ),
                   const SizedBox(height: 10),
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.participantBTotalSeconds,
-                    options: const [
-                      ChoiceOption('B 3분', 180),
-                      ChoiceOption('B 5분', 300),
-                      ChoiceOption('B 7분', 420),
-                      ChoiceOption('B 10분', 600),
-                    ],
-                    onSelected: (value) {
+                    options: participantBTotalMinuteOptions,
+                    inputKey: 'participant-b-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(
                         _draft.copyWith(participantBTotalSeconds: value),
                       );
@@ -125,16 +126,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '턴 제한',
               children: [
-                _ChoiceGroup<int>(
+                MinutePresetField(
                   value: _draft.turnLimitSeconds,
-                  options: const [
-                    ChoiceOption('턴 30초', 30),
-                    ChoiceOption('턴 45초', 45),
-                    ChoiceOption('턴 1분', 60),
-                    ChoiceOption('턴 1분 30초', 90),
-                    ChoiceOption('턴 2분', 120),
-                  ],
-                  onSelected: (value) {
+                  options: turnLimitMinuteOptions,
+                  inputKey: 'turn-limit-minutes-field',
+                  minMinutes: minTurnLimitMinutes,
+                  maxMinutes: maxTurnLimitMinutes,
+                  rangeMessage: invalidTurnLimitRangeMessage,
+                  onInvalidInput: _handleInvalidInput,
+                  onChanged: (value) {
                     _updateDraft(_draft.copyWith(turnLimitSeconds: value));
                   },
                 ),
@@ -155,36 +155,38 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 ),
-                _ChoiceGroup<int>(
-                  value: _draft.penaltyThresholdSeconds,
-                  options: const [
-                    ChoiceOption('주의 표시 30초', 30),
-                    ChoiceOption('주의 표시 1분', 60),
-                    ChoiceOption('주의 표시 2분', 120),
-                    ChoiceOption('주의 표시 3분', 180),
-                  ],
-                  onSelected: (value) {
-                    _updateDraft(
-                      _draft.copyWith(penaltyThresholdSeconds: value),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _ToggleRow(
-                  label: '주의 표시 반복',
-                  value:
-                      _draft.penaltyRepeatMode ==
-                      PenaltyRepeatMode.everyThreshold,
-                  onChanged: (value) {
-                    _updateDraft(
-                      _draft.copyWith(
-                        penaltyRepeatMode: value
-                            ? PenaltyRepeatMode.everyThreshold
-                            : PenaltyRepeatMode.oncePerTurn,
-                      ),
-                    );
-                  },
-                ),
+                if (_draft.overtimeEnabled) ...[
+                  _ChoiceGroup<int>(
+                    value: _draft.penaltyThresholdSeconds,
+                    options: const [
+                      ChoiceOption('주의 표시 30초', 30),
+                      ChoiceOption('주의 표시 1분', 60),
+                      ChoiceOption('주의 표시 2분', 120),
+                      ChoiceOption('주의 표시 3분', 180),
+                    ],
+                    onSelected: (value) {
+                      _updateDraft(
+                        _draft.copyWith(penaltyThresholdSeconds: value),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _ToggleRow(
+                    label: '주의 표시 반복',
+                    value:
+                        _draft.penaltyRepeatMode ==
+                        PenaltyRepeatMode.everyThreshold,
+                    onChanged: (value) {
+                      _updateDraft(
+                        _draft.copyWith(
+                          penaltyRepeatMode: value
+                              ? PenaltyRepeatMode.everyThreshold
+                              : PenaltyRepeatMode.oncePerTurn,
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
             _Section(
@@ -217,22 +219,24 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                     _updateDraft(_draft.copyWith(totalWarningEnabled: value));
                   },
                 ),
-                _ToggleRow(
-                  label: '오버타임 시작',
-                  value: _draft.overtimeStartAlertEnabled,
-                  onChanged: (value) {
-                    _updateDraft(
-                      _draft.copyWith(overtimeStartAlertEnabled: value),
-                    );
-                  },
-                ),
-                _ToggleRow(
-                  label: '주의 표시',
-                  value: _draft.penaltyAlertEnabled,
-                  onChanged: (value) {
-                    _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
-                  },
-                ),
+                if (_draft.overtimeEnabled) ...[
+                  _ToggleRow(
+                    label: '오버타임 시작',
+                    value: _draft.overtimeStartAlertEnabled,
+                    onChanged: (value) {
+                      _updateDraft(
+                        _draft.copyWith(overtimeStartAlertEnabled: value),
+                      );
+                    },
+                  ),
+                  _ToggleRow(
+                    label: '주의 표시',
+                    value: _draft.penaltyAlertEnabled,
+                    onChanged: (value) {
+                      _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _ToggleRow(
                   label: '화면',
@@ -267,6 +271,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                     setState(() {
                       _settings = _settings.copyWith(autoSaveRecords: value);
                       _statusMessage = null;
+                      _validationMessage = null;
                     });
                   },
                 ),
@@ -282,6 +287,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: _saveSettings,
               child: const Text('설정 저장'),
             ),
+            if (_validationMessage != null) ...[
+              const SizedBox(height: 12),
+              ValidationNotice(_validationMessage!),
+            ],
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),
               _StatusLine(_statusMessage!),
@@ -296,12 +305,30 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _settings = _settings.copyWith(sessionDefaults: draft);
       _statusMessage = null;
+      _validationMessage = null;
+    });
+  }
+
+  void _handleInvalidInput(String message) {
+    setState(() {
+      _statusMessage = null;
+      _validationMessage = message;
     });
   }
 
   void _saveSettings() {
+    final validationMessage = validateSessionSettingsDraft(_draft);
+    if (validationMessage != null) {
+      setState(() {
+        _validationMessage = validationMessage;
+        _statusMessage = null;
+      });
+      return;
+    }
+
     widget.onSettingsChanged(_settings);
     setState(() {
+      _validationMessage = null;
       _statusMessage = '다음 대화에 사용할 설정을 저장했어요.';
     });
   }
@@ -310,6 +337,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _isBusy = true;
       _statusMessage = null;
+      _validationMessage = null;
     });
     await widget.recordStore.clear();
     if (!mounted) {

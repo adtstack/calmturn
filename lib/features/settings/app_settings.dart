@@ -78,7 +78,11 @@ final class JsonAppSettingsStore implements AppSettingsStore {
       if (sessionConfig is! Map<String, Object?>) {
         return null;
       }
-      return _sessionConfigFromJson(sessionConfig);
+      final config = _sessionConfigFromJson(sessionConfig);
+      if (validateSessionConfig(config) != null) {
+        return null;
+      }
+      return config;
     } catch (_) {
       return null;
     }

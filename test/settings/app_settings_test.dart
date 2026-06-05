@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:calmturn/features/settings/app_settings.dart';
@@ -21,7 +22,7 @@ Future<void> main() async {
           _expectEquals(loaded.participantB.name, 'B');
           _expectEquals(loaded.participantA.totalAllocatedSeconds, 180);
           _expectEquals(loaded.participantB.totalAllocatedSeconds, 420);
-          _expectEquals(loaded.turnLimitSeconds, 45);
+          _expectEquals(loaded.turnLimitSeconds, 60);
           _expectEquals(loaded.firstSpeakerId, 'b');
           _expectEquals(loaded.overtimeConfig.enabled, false);
           _expectEquals(loaded.overtimeConfig.showOvertime, false);
@@ -55,6 +56,51 @@ Future<void> main() async {
 
       _expect(loaded == null, 'corrupt settings should be ignored');
     },
+    'json app settings store ignores semantically impossible settings':
+        () async {
+          final storage = InMemoryAppSettingsStorage();
+          await storage.write(
+            _settingsJson(
+              turnLimitSeconds: 300,
+              participantATotalSeconds: 180,
+              participantBTotalSeconds: 180,
+            ),
+          );
+          final store = JsonAppSettingsStore(storage: storage);
+
+          final loaded = await store.loadSessionConfig();
+
+          _expect(
+            loaded == null,
+            'impossible stored settings should be ignored',
+          );
+        },
+    'json app settings store ignores settings with invalid identities':
+        () async {
+          final storage = InMemoryAppSettingsStorage();
+          await storage.write(_settingsJson(firstSpeakerId: 'missing'));
+          final store = JsonAppSettingsStore(storage: storage);
+
+          final loaded = await store.loadSessionConfig();
+
+          _expect(loaded == null, 'invalid speaker settings should be ignored');
+        },
+    'json app settings store ignores settings with no alert delivery':
+        () async {
+          final storage = InMemoryAppSettingsStorage();
+          await storage.write(
+            _settingsJson(
+              visualEnabled: false,
+              soundEnabled: false,
+              hapticEnabled: false,
+            ),
+          );
+          final store = JsonAppSettingsStore(storage: storage);
+
+          final loaded = await store.loadSessionConfig();
+
+          _expect(loaded == null, 'silent alert settings should be ignored');
+        },
     'json app settings store ignores storage read failures': () async {
       final store = JsonAppSettingsStore(
         storage: _FailingReadSettingsStorage(),
@@ -141,7 +187,7 @@ SessionConfig _config() {
       name: 'B',
       totalAllocatedSeconds: 420,
     ),
-    turnLimitSeconds: 45,
+    turnLimitSeconds: 60,
     firstSpeakerId: 'b',
     overtimeConfig: OvertimeConfig(
       enabled: false,
@@ -149,16 +195,81 @@ SessionConfig _config() {
       behavior: TurnLimitBehavior.autoPause,
     ),
     penaltyConfig: PenaltyConfig(
+      enabled: false,
       thresholdSeconds: 30,
       repeatMode: PenaltyRepeatMode.everyThreshold,
       labelMode: PenaltyLabelMode.warningMark,
     ),
     alertConfig: AlertConfig(
       warningBeforeSeconds: 5,
+      overtimeStartAlertEnabled: false,
+      penaltyAlertEnabled: false,
       soundEnabled: true,
       hapticEnabled: false,
     ),
   );
+}
+
+String _settingsJson({
+  int participantATotalSeconds = 300,
+  int participantBTotalSeconds = 300,
+  int turnLimitSeconds = 60,
+  String firstSpeakerId = 'a',
+  bool overtimeEnabled = true,
+  bool showOvertime = true,
+  TurnLimitBehavior behavior = TurnLimitBehavior.overtime,
+  bool penaltyEnabled = true,
+  int penaltyThresholdSeconds = 60,
+  int warningBeforeSeconds = 10,
+  bool turnWarningEnabled = true,
+  bool totalWarningEnabled = true,
+  bool overtimeStartAlertEnabled = true,
+  bool penaltyAlertEnabled = true,
+  bool visualEnabled = true,
+  bool soundEnabled = false,
+  bool hapticEnabled = true,
+}) {
+  return jsonEncode({
+    'version': 1,
+    'sessionConfig': {
+      'participantA': {
+        'id': 'a',
+        'name': 'A',
+        'totalAllocatedSeconds': participantATotalSeconds,
+      },
+      'participantB': {
+        'id': 'b',
+        'name': 'B',
+        'totalAllocatedSeconds': participantBTotalSeconds,
+      },
+      'turnLimitSeconds': turnLimitSeconds,
+      'firstSpeakerId': firstSpeakerId,
+      'overtimeConfig': {
+        'enabled': overtimeEnabled,
+        'showOvertime': showOvertime,
+        'behavior': behavior.name,
+      },
+      'penaltyConfig': {
+        'enabled': penaltyEnabled,
+        'thresholdSeconds': penaltyThresholdSeconds,
+        'repeatMode': PenaltyRepeatMode.oncePerTurn.name,
+        'labelMode': PenaltyLabelMode.overtimeMark.name,
+      },
+      'alertConfig': {
+        'warningBeforeSeconds': warningBeforeSeconds,
+        'turnWarningEnabled': turnWarningEnabled,
+        'totalWarningEnabled': totalWarningEnabled,
+        'overtimeStartAlertEnabled': overtimeStartAlertEnabled,
+        'penaltyAlertEnabled': penaltyAlertEnabled,
+        'visualEnabled': visualEnabled,
+        'soundEnabled': soundEnabled,
+        'hapticEnabled': hapticEnabled,
+        'soundType': 'soft',
+        'hapticStrength': 'medium',
+      },
+      'requireBothConsentForExtension': true,
+    },
+  });
 }
 
 void _expect(bool condition, String message) {

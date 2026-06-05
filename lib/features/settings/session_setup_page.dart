@@ -1,7 +1,38 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../timer/domain/timer_models.dart';
 import 'session_settings.dart';
+
+const sharedTotalMinuteOptions = [
+  ChoiceOption('각자 3분', 180),
+  ChoiceOption('각자 5분', 300),
+  ChoiceOption('각자 10분', 600),
+  ChoiceOption('각자 15분', 900),
+  ChoiceOption('각자 30분', 1800),
+];
+
+const participantATotalMinuteOptions = [
+  ChoiceOption('A 3분', 180),
+  ChoiceOption('A 5분', 300),
+  ChoiceOption('A 7분', 420),
+  ChoiceOption('A 10분', 600),
+  ChoiceOption('A 30분', 1800),
+];
+
+const participantBTotalMinuteOptions = [
+  ChoiceOption('B 3분', 180),
+  ChoiceOption('B 5분', 300),
+  ChoiceOption('B 7분', 420),
+  ChoiceOption('B 10분', 600),
+  ChoiceOption('B 30분', 1800),
+];
+
+const turnLimitMinuteOptions = [
+  ChoiceOption('턴 1분', 60),
+  ChoiceOption('턴 5분', 300),
+  ChoiceOption('턴 10분', 600),
+];
 
 final class SessionSetupPage extends StatefulWidget {
   final ValueChanged<SessionConfig> onSessionAccepted;
@@ -28,6 +59,7 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
   bool _participantAAgreed = false;
   bool _participantBAgreed = false;
   bool _showAdvanced = false;
+  String? _validationMessage;
 
   @override
   void initState() {
@@ -115,43 +147,43 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
               title: '전체 시간',
               children: [
                 if (_draft.totalTimeMode == TotalTimeMode.same)
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.sharedTotalSeconds,
-                    options: const [
-                      ChoiceOption('각자 3분', 180),
-                      ChoiceOption('각자 5분', 300),
-                      ChoiceOption('각자 10분', 600),
-                      ChoiceOption('각자 15분', 900),
-                    ],
-                    onSelected: (value) {
+                    options: sharedTotalMinuteOptions,
+                    inputKey: 'shared-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(_draft.copyWith(sharedTotalSeconds: value));
                     },
                   )
                 else ...[
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.participantATotalSeconds,
-                    options: const [
-                      ChoiceOption('A 3분', 180),
-                      ChoiceOption('A 5분', 300),
-                      ChoiceOption('A 7분', 420),
-                      ChoiceOption('A 10분', 600),
-                    ],
-                    onSelected: (value) {
+                    options: participantATotalMinuteOptions,
+                    inputKey: 'participant-a-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(
                         _draft.copyWith(participantATotalSeconds: value),
                       );
                     },
                   ),
                   const SizedBox(height: 10),
-                  _ChoiceGroup<int>(
+                  MinutePresetField(
                     value: _draft.participantBTotalSeconds,
-                    options: const [
-                      ChoiceOption('B 3분', 180),
-                      ChoiceOption('B 5분', 300),
-                      ChoiceOption('B 7분', 420),
-                      ChoiceOption('B 10분', 600),
-                    ],
-                    onSelected: (value) {
+                    options: participantBTotalMinuteOptions,
+                    inputKey: 'participant-b-total-minutes-field',
+                    minMinutes: minTotalMinutes,
+                    maxMinutes: maxTotalMinutes,
+                    rangeMessage: invalidTotalTimeRangeMessage,
+                    onInvalidInput: _handleInvalidInput,
+                    onChanged: (value) {
                       _updateDraft(
                         _draft.copyWith(participantBTotalSeconds: value),
                       );
@@ -163,16 +195,15 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
             _Section(
               title: '턴 제한',
               children: [
-                _ChoiceGroup<int>(
+                MinutePresetField(
                   value: _draft.turnLimitSeconds,
-                  options: const [
-                    ChoiceOption('턴 30초', 30),
-                    ChoiceOption('턴 45초', 45),
-                    ChoiceOption('턴 1분', 60),
-                    ChoiceOption('턴 1분 30초', 90),
-                    ChoiceOption('턴 2분', 120),
-                  ],
-                  onSelected: (value) {
+                  options: turnLimitMinuteOptions,
+                  inputKey: 'turn-limit-minutes-field',
+                  minMinutes: minTurnLimitMinutes,
+                  maxMinutes: maxTurnLimitMinutes,
+                  rangeMessage: invalidTurnLimitRangeMessage,
+                  onInvalidInput: _handleInvalidInput,
+                  onChanged: (value) {
                     _updateDraft(_draft.copyWith(turnLimitSeconds: value));
                   },
                 ),
@@ -228,30 +259,30 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                   if (_draft.totalTimeMode ==
                       TotalTimeMode.customPerParticipant) ...[
                     const SizedBox(height: 14),
-                    _ChoiceGroup<int>(
+                    MinutePresetField(
                       value: _draft.participantATotalSeconds,
-                      options: const [
-                        ChoiceOption('A 3분', 180),
-                        ChoiceOption('A 5분', 300),
-                        ChoiceOption('A 7분', 420),
-                        ChoiceOption('A 10분', 600),
-                      ],
-                      onSelected: (value) {
+                      options: participantATotalMinuteOptions,
+                      inputKey: 'participant-a-total-minutes-field',
+                      minMinutes: minTotalMinutes,
+                      maxMinutes: maxTotalMinutes,
+                      rangeMessage: invalidTotalTimeRangeMessage,
+                      onInvalidInput: _handleInvalidInput,
+                      onChanged: (value) {
                         _updateDraft(
                           _draft.copyWith(participantATotalSeconds: value),
                         );
                       },
                     ),
                     const SizedBox(height: 10),
-                    _ChoiceGroup<int>(
+                    MinutePresetField(
                       value: _draft.participantBTotalSeconds,
-                      options: const [
-                        ChoiceOption('B 3분', 180),
-                        ChoiceOption('B 5분', 300),
-                        ChoiceOption('B 7분', 420),
-                        ChoiceOption('B 10분', 600),
-                      ],
-                      onSelected: (value) {
+                      options: participantBTotalMinuteOptions,
+                      inputKey: 'participant-b-total-minutes-field',
+                      minMinutes: minTotalMinutes,
+                      maxMinutes: maxTotalMinutes,
+                      rangeMessage: invalidTotalTimeRangeMessage,
+                      onInvalidInput: _handleInvalidInput,
+                      onChanged: (value) {
                         _updateDraft(
                           _draft.copyWith(participantBTotalSeconds: value),
                         );
@@ -275,46 +306,46 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                       );
                     },
                   ),
-                  _ToggleRow(
-                    label: '오버타임 표시',
-                    value: _draft.showOvertime,
-                    onChanged: _draft.overtimeEnabled
-                        ? (value) {
-                            _updateDraft(_draft.copyWith(showOvertime: value));
-                          }
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _ChoiceGroup<int>(
-                    value: _draft.penaltyThresholdSeconds,
-                    options: const [
-                      ChoiceOption('주의 표시 30초', 30),
-                      ChoiceOption('주의 표시 1분', 60),
-                      ChoiceOption('주의 표시 2분', 120),
-                      ChoiceOption('주의 표시 3분', 180),
-                    ],
-                    onSelected: (value) {
-                      _updateDraft(
-                        _draft.copyWith(penaltyThresholdSeconds: value),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _ToggleRow(
-                    label: '주의 표시 반복',
-                    value:
-                        _draft.penaltyRepeatMode ==
-                        PenaltyRepeatMode.everyThreshold,
-                    onChanged: (value) {
-                      _updateDraft(
-                        _draft.copyWith(
-                          penaltyRepeatMode: value
-                              ? PenaltyRepeatMode.everyThreshold
-                              : PenaltyRepeatMode.oncePerTurn,
-                        ),
-                      );
-                    },
-                  ),
+                  if (_draft.overtimeEnabled) ...[
+                    _ToggleRow(
+                      label: '오버타임 표시',
+                      value: _draft.showOvertime,
+                      onChanged: (value) {
+                        _updateDraft(_draft.copyWith(showOvertime: value));
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _ChoiceGroup<int>(
+                      value: _draft.penaltyThresholdSeconds,
+                      options: const [
+                        ChoiceOption('주의 표시 30초', 30),
+                        ChoiceOption('주의 표시 1분', 60),
+                        ChoiceOption('주의 표시 2분', 120),
+                        ChoiceOption('주의 표시 3분', 180),
+                      ],
+                      onSelected: (value) {
+                        _updateDraft(
+                          _draft.copyWith(penaltyThresholdSeconds: value),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _ToggleRow(
+                      label: '주의 표시 반복',
+                      value:
+                          _draft.penaltyRepeatMode ==
+                          PenaltyRepeatMode.everyThreshold,
+                      onChanged: (value) {
+                        _updateDraft(
+                          _draft.copyWith(
+                            penaltyRepeatMode: value
+                                ? PenaltyRepeatMode.everyThreshold
+                                : PenaltyRepeatMode.oncePerTurn,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
               _Section(
@@ -349,22 +380,26 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                       _updateDraft(_draft.copyWith(totalWarningEnabled: value));
                     },
                   ),
-                  _ToggleRow(
-                    label: '오버타임 시작',
-                    value: _draft.overtimeStartAlertEnabled,
-                    onChanged: (value) {
-                      _updateDraft(
-                        _draft.copyWith(overtimeStartAlertEnabled: value),
-                      );
-                    },
-                  ),
-                  _ToggleRow(
-                    label: '주의 표시',
-                    value: _draft.penaltyAlertEnabled,
-                    onChanged: (value) {
-                      _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
-                    },
-                  ),
+                  if (_draft.overtimeEnabled) ...[
+                    _ToggleRow(
+                      label: '오버타임 시작',
+                      value: _draft.overtimeStartAlertEnabled,
+                      onChanged: (value) {
+                        _updateDraft(
+                          _draft.copyWith(overtimeStartAlertEnabled: value),
+                        );
+                      },
+                    ),
+                    _ToggleRow(
+                      label: '주의 표시',
+                      value: _draft.penaltyAlertEnabled,
+                      onChanged: (value) {
+                        _updateDraft(
+                          _draft.copyWith(penaltyAlertEnabled: value),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   _ToggleRow(
                     label: '화면',
@@ -390,15 +425,14 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                 ],
               ),
             ],
+            if (_validationMessage != null) ...[
+              const SizedBox(height: 8),
+              ValidationNotice(_validationMessage!),
+              const SizedBox(height: 8),
+            ],
             const SizedBox(height: 8),
             CupertinoButton.filled(
-              onPressed: () {
-                setState(() {
-                  _participantAAgreed = false;
-                  _participantBAgreed = false;
-                  _isReviewing = true;
-                });
-              },
+              onPressed: _reviewRules,
               child: const Text('규칙 확인'),
             ),
           ],
@@ -410,6 +444,30 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
   void _updateDraft(SessionSettingsDraft draft) {
     setState(() {
       _draft = draft;
+      _validationMessage = null;
+    });
+  }
+
+  void _handleInvalidInput(String message) {
+    setState(() {
+      _validationMessage = message;
+    });
+  }
+
+  void _reviewRules() {
+    final validationMessage = validateSessionSettingsDraft(_draft);
+    if (validationMessage != null) {
+      setState(() {
+        _validationMessage = validationMessage;
+      });
+      return;
+    }
+
+    setState(() {
+      _validationMessage = null;
+      _participantAAgreed = false;
+      _participantBAgreed = false;
+      _isReviewing = true;
     });
   }
 }
@@ -523,6 +581,200 @@ final class ChoiceOption<T> {
   final T value;
 
   const ChoiceOption(this.label, this.value);
+}
+
+final class MinutePresetField extends StatefulWidget {
+  final int value;
+  final List<ChoiceOption<int>> options;
+  final String inputKey;
+  final int minMinutes;
+  final int maxMinutes;
+  final String rangeMessage;
+  final ValueChanged<int> onChanged;
+  final ValueChanged<String> onInvalidInput;
+
+  const MinutePresetField({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.inputKey,
+    required this.minMinutes,
+    required this.maxMinutes,
+    required this.rangeMessage,
+    required this.onChanged,
+    required this.onInvalidInput,
+  });
+
+  @override
+  State<MinutePresetField> createState() => _MinutePresetFieldState();
+}
+
+final class _MinutePresetFieldState extends State<MinutePresetField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _minutesText(widget.value));
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant MinutePresetField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      final nextText = _minutesText(widget.value);
+      if (_controller.text != nextText) {
+        _controller.text = nextText;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChanged);
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChanged() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPresetValue = widget.options.any((option) {
+      return option.value == widget.value;
+    });
+    final customSelected = !hasPresetValue || _focusNode.hasFocus;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...widget.options.map((option) {
+          final isSelected = option.value == widget.value;
+          return CupertinoButton(
+            minimumSize: const Size(0, 40),
+            color: isSelected
+                ? const Color(0xFF2D6A64)
+                : const Color(0xFFECE7DB),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            onPressed: () {
+              widget.onChanged(option.value);
+              _focusNode.unfocus();
+            },
+            child: Text(
+              option.label,
+              style: TextStyle(
+                color: isSelected
+                    ? CupertinoColors.white
+                    : const Color(0xFF1C2523),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }),
+        GestureDetector(
+          key: ValueKey(widget.inputKey.replaceFirst('-field', '-option')),
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            _focusNode.requestFocus();
+            _controller.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _controller.text.length,
+            );
+          },
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: customSelected
+                  ? const Color(0xFF2D6A64)
+                  : const Color(0xFFECE7DB),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '직접 입력',
+                    style: TextStyle(
+                      color: customSelected
+                          ? CupertinoColors.white
+                          : const Color(0xFF1C2523),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 44,
+                    child: CupertinoTextField(
+                      key: ValueKey(widget.inputKey),
+                      focusNode: _focusNode,
+                      controller: _controller,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: null,
+                      padding: EdgeInsets.zero,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: customSelected
+                            ? CupertinoColors.white
+                            : const Color(0xFF1C2523),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      cursorColor: customSelected
+                          ? CupertinoColors.white
+                          : const Color(0xFF2D6A64),
+                      onChanged: (value) {
+                        final minutes = int.tryParse(value);
+                        if (minutes == null || value.isEmpty) {
+                          return;
+                        }
+                        if (minutes < widget.minMinutes ||
+                            minutes > widget.maxMinutes) {
+                          widget.onInvalidInput(widget.rangeMessage);
+                          return;
+                        }
+                        widget.onChanged(minutes * 60);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '분',
+                    style: TextStyle(
+                      color: customSelected
+                          ? CupertinoColors.white
+                          : const Color(0xFF1C2523),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _minutesText(int seconds) {
+  if (seconds % 60 != 0) {
+    return '';
+  }
+  return '${seconds ~/ 60}';
 }
 
 final class _ChoiceGroup<T> extends StatelessWidget {
@@ -727,6 +979,34 @@ final class _Notice extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(padding: const EdgeInsets.all(14), child: Text(text)),
+    );
+  }
+}
+
+final class ValidationNotice extends StatelessWidget {
+  final String text;
+
+  const ValidationNotice(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0E8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE0A58D)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF9A3B23),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }

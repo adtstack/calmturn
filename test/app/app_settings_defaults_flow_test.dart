@@ -43,7 +43,7 @@ void main() {
     expect(find.text('앱 설정'), findsOneWidget);
 
     await _tapText(tester, '각자 10분');
-    await _tapText(tester, '턴 1분 30초');
+    await _tapText(tester, '턴 5분');
     await _tapText(tester, '소리');
     await _tapText(tester, '설정 저장');
 
@@ -54,8 +54,112 @@ void main() {
 
     expect(find.text('말하는 사람 A 전체 시간: 10:00'), findsOneWidget);
     expect(find.text('말하는 사람 B 전체 시간: 10:00'), findsOneWidget);
-    expect(find.text('턴 제한: 1:30'), findsOneWidget);
+    expect(find.text('턴 제한: 5:00'), findsOneWidget);
     expect(find.text('알림: 화면 + 소리 + 진동'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app settings custom minute inputs are saved as defaults', (
+    tester,
+  ) async {
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+
+    await _tapText(tester, '앱 설정');
+    await tester.enterText(
+      find.byKey(const ValueKey('shared-total-minutes-field')),
+      '35abc',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('turn-limit-minutes-field')),
+      '12분',
+    );
+
+    expect(
+      _editableTextValue(tester, 'shared-total-minutes-field'),
+      equals('35'),
+    );
+    expect(
+      _editableTextValue(tester, 'turn-limit-minutes-field'),
+      equals('12'),
+    );
+    expect(
+      _fieldInsideOption(tester, 'shared-total-minutes-option'),
+      findsOneWidget,
+    );
+    expect(
+      _fieldInsideOption(tester, 'turn-limit-minutes-option'),
+      findsOneWidget,
+    );
+
+    await _tapText(tester, '설정 저장');
+    await _tapText(tester, '대화 규칙으로');
+    await _tapText(tester, '규칙 확인');
+
+    expect(find.text('말하는 사람 A 전체 시간: 35:00'), findsOneWidget);
+    expect(find.text('말하는 사람 B 전체 시간: 35:00'), findsOneWidget);
+    expect(find.text('턴 제한: 12:00'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app settings reject turn limits longer than total time', (
+    tester,
+  ) async {
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+
+    await _tapText(tester, '앱 설정');
+    await _tapText(tester, '각자 3분');
+    await _tapText(tester, '턴 5분');
+    await _tapText(tester, '설정 저장');
+
+    expect(find.text('턴 제한은 전체 시간보다 길 수 없어요.'), findsOneWidget);
+    expect(find.text('다음 대화에 사용할 설정을 저장했어요.'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app settings reject unreachable penalty thresholds', (
+    tester,
+  ) async {
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+
+    await _tapText(tester, '앱 설정');
+    await _tapText(tester, '각자 3분');
+    await _tapText(tester, '주의 표시 3분');
+    await _tapText(tester, '설정 저장');
+
+    expect(find.text('주의 표시 기준은 가능한 오버타임보다 길 수 없어요.'), findsOneWidget);
+    expect(find.text('다음 대화에 사용할 설정을 저장했어요.'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app settings hide overtime only controls when overtime is off', (
+    tester,
+  ) async {
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+
+    await _tapText(tester, '앱 설정');
+    expect(find.text('주의 표시 30초'), findsOneWidget);
+
+    await _tapText(tester, '오버타임');
+
+    expect(find.text('주의 표시 30초'), findsNothing);
+    expect(find.text('오버타임 시작'), findsNothing);
+    expect(find.text('주의 표시'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -191,6 +295,21 @@ Future<void> _tapText(
   } else {
     await tester.pump();
   }
+}
+
+String _editableTextValue(WidgetTester tester, String key) {
+  final editable = find.descendant(
+    of: find.byKey(ValueKey(key)),
+    matching: find.byType(EditableText),
+  );
+  return tester.widget<EditableText>(editable).controller.text;
+}
+
+Finder _fieldInsideOption(WidgetTester tester, String key) {
+  return find.descendant(
+    of: find.byKey(ValueKey(key)),
+    matching: find.byType(CupertinoTextField),
+  );
 }
 
 SessionConfig _config() {

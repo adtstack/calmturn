@@ -2,6 +2,21 @@ import '../timer/domain/timer_models.dart';
 
 enum TotalTimeMode { same, customPerParticipant }
 
+const invalidTurnLimitMessage = '턴 제한은 전체 시간보다 길 수 없어요.';
+const invalidOvertimeWindowMessage = '오버타임을 쓰려면 턴 제한이 전체 시간보다 짧아야 해요.';
+const invalidPenaltyThresholdMessage = '주의 표시 기준은 가능한 오버타임보다 길 수 없어요.';
+const invalidWarningBeforeMessage = '알림 시점은 턴 제한과 전체 시간보다 짧아야 해요.';
+const invalidAlertDeliveryMessage = '알림 방식이 모두 꺼져 있어요.';
+const invalidAlertTargetMessage = '알림 대상이 모두 꺼져 있어요.';
+const invalidTotalTimeRangeMessage = '전체 시간은 1분부터 240분까지 입력할 수 있어요.';
+const invalidTurnLimitRangeMessage = '턴 제한은 1분부터 60분까지 입력할 수 있어요.';
+const invalidSessionConfigMessage = '저장된 설정을 다시 확인해야 해요.';
+
+const minTotalMinutes = 1;
+const maxTotalMinutes = 240;
+const minTurnLimitMinutes = 1;
+const maxTurnLimitMinutes = 60;
+
 final class SessionSettingsDraft {
   static const participantAId = 'a';
   static const participantBId = 'b';
@@ -108,6 +123,11 @@ final class SessionSettingsDraft {
     final overtimeBehavior = overtimeEnabled
         ? TurnLimitBehavior.overtime
         : TurnLimitBehavior.autoPause;
+    final effectivePenaltyEnabled = overtimeEnabled && penaltyEnabled;
+    final effectiveOvertimeStartAlertEnabled =
+        overtimeEnabled && overtimeStartAlertEnabled;
+    final effectivePenaltyAlertEnabled =
+        effectivePenaltyEnabled && penaltyAlertEnabled;
 
     return SessionConfig(
       participantA: ParticipantConfig(
@@ -128,7 +148,7 @@ final class SessionSettingsDraft {
         behavior: overtimeBehavior,
       ),
       penaltyConfig: PenaltyConfig(
-        enabled: penaltyEnabled,
+        enabled: effectivePenaltyEnabled,
         thresholdSeconds: penaltyThresholdSeconds,
         repeatMode: penaltyRepeatMode,
         labelMode: penaltyLabelMode,
@@ -137,8 +157,8 @@ final class SessionSettingsDraft {
         warningBeforeSeconds: warningBeforeSeconds,
         turnWarningEnabled: turnWarningEnabled,
         totalWarningEnabled: totalWarningEnabled,
-        overtimeStartAlertEnabled: overtimeStartAlertEnabled,
-        penaltyAlertEnabled: penaltyAlertEnabled,
+        overtimeStartAlertEnabled: effectiveOvertimeStartAlertEnabled,
+        penaltyAlertEnabled: effectivePenaltyAlertEnabled,
         visualEnabled: visualEnabled,
         soundEnabled: soundEnabled,
         hapticEnabled: hapticEnabled,
@@ -210,4 +230,268 @@ final class SessionSettingsDraft {
 String _cleanName(String value, String fallback) {
   final trimmed = value.trim();
   return trimmed.isEmpty ? fallback : trimmed;
+}
+
+String? validateSessionSettingsDraft(SessionSettingsDraft draft) {
+  return _validateSessionSettings(
+    participantAId: SessionSettingsDraft.participantAId,
+    participantBId: SessionSettingsDraft.participantBId,
+    participantATotalSeconds: draft.effectiveParticipantATotalSeconds,
+    participantBTotalSeconds: draft.effectiveParticipantBTotalSeconds,
+    turnLimitSeconds: draft.turnLimitSeconds,
+    firstSpeakerId: draft.firstSpeakerId,
+    overtimeEnabled: draft.overtimeEnabled,
+    showOvertime: draft.overtimeEnabled && draft.showOvertime,
+    overtimeBehavior: draft.overtimeEnabled
+        ? TurnLimitBehavior.overtime
+        : TurnLimitBehavior.autoPause,
+    penaltyEnabled: draft.overtimeEnabled && draft.penaltyEnabled,
+    penaltyThresholdSeconds: draft.penaltyThresholdSeconds,
+    warningBeforeSeconds: draft.warningBeforeSeconds,
+    turnWarningEnabled: draft.turnWarningEnabled,
+    totalWarningEnabled: draft.totalWarningEnabled,
+    overtimeStartAlertEnabled:
+        draft.overtimeEnabled && draft.overtimeStartAlertEnabled,
+    penaltyAlertEnabled:
+        draft.overtimeEnabled &&
+        draft.penaltyEnabled &&
+        draft.penaltyAlertEnabled,
+    visualEnabled: draft.visualEnabled,
+    soundEnabled: draft.soundEnabled,
+    hapticEnabled: draft.hapticEnabled,
+  );
+}
+
+String? validateSessionConfig(SessionConfig config) {
+  final identityMessage = _validateSessionIdentities(config);
+  if (identityMessage != null) {
+    return identityMessage;
+  }
+
+  if (!config.overtimeConfig.enabled &&
+      (config.overtimeConfig.showOvertime ||
+          config.penaltyConfig.enabled ||
+          config.alertConfig.overtimeStartAlertEnabled ||
+          config.alertConfig.penaltyAlertEnabled)) {
+    return invalidSessionConfigMessage;
+  }
+
+  return _validateSessionSettings(
+    participantAId: config.participantA.id,
+    participantBId: config.participantB.id,
+    participantATotalSeconds: config.participantA.totalAllocatedSeconds,
+    participantBTotalSeconds: config.participantB.totalAllocatedSeconds,
+    turnLimitSeconds: config.turnLimitSeconds,
+    firstSpeakerId: config.firstSpeakerId,
+    overtimeEnabled: config.overtimeConfig.enabled,
+    showOvertime: config.overtimeConfig.showOvertime,
+    overtimeBehavior: config.overtimeConfig.behavior,
+    penaltyEnabled: config.penaltyConfig.enabled,
+    penaltyThresholdSeconds: config.penaltyConfig.thresholdSeconds,
+    warningBeforeSeconds: config.alertConfig.warningBeforeSeconds,
+    turnWarningEnabled: config.alertConfig.turnWarningEnabled,
+    totalWarningEnabled: config.alertConfig.totalWarningEnabled,
+    overtimeStartAlertEnabled: config.alertConfig.overtimeStartAlertEnabled,
+    penaltyAlertEnabled: config.alertConfig.penaltyAlertEnabled,
+    visualEnabled: config.alertConfig.visualEnabled,
+    soundEnabled: config.alertConfig.soundEnabled,
+    hapticEnabled: config.alertConfig.hapticEnabled,
+  );
+}
+
+String? _validateSessionSettings({
+  required String participantAId,
+  required String participantBId,
+  required int participantATotalSeconds,
+  required int participantBTotalSeconds,
+  required int turnLimitSeconds,
+  required String firstSpeakerId,
+  required bool overtimeEnabled,
+  required bool showOvertime,
+  required TurnLimitBehavior overtimeBehavior,
+  required bool penaltyEnabled,
+  required int penaltyThresholdSeconds,
+  required int warningBeforeSeconds,
+  required bool turnWarningEnabled,
+  required bool totalWarningEnabled,
+  required bool overtimeStartAlertEnabled,
+  required bool penaltyAlertEnabled,
+  required bool visualEnabled,
+  required bool soundEnabled,
+  required bool hapticEnabled,
+}) {
+  final totalRangeMessage = _validateTotalSeconds(participantATotalSeconds);
+  if (totalRangeMessage != null) {
+    return totalRangeMessage;
+  }
+
+  final otherTotalRangeMessage = _validateTotalSeconds(
+    participantBTotalSeconds,
+  );
+  if (otherTotalRangeMessage != null) {
+    return otherTotalRangeMessage;
+  }
+
+  final turnRangeMessage = _validateTurnLimitSeconds(turnLimitSeconds);
+  if (turnRangeMessage != null) {
+    return turnRangeMessage;
+  }
+
+  if (warningBeforeSeconds <= 0 || penaltyThresholdSeconds <= 0) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (participantAId.isEmpty ||
+      participantBId.isEmpty ||
+      participantAId == participantBId ||
+      (firstSpeakerId != participantAId && firstSpeakerId != participantBId)) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (!overtimeEnabled && showOvertime) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (overtimeEnabled && overtimeBehavior != TurnLimitBehavior.overtime) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (!overtimeEnabled && overtimeBehavior == TurnLimitBehavior.overtime) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (!overtimeEnabled && penaltyEnabled) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (!overtimeEnabled && (overtimeStartAlertEnabled || penaltyAlertEnabled)) {
+    return invalidSessionConfigMessage;
+  }
+
+  final shortestTotal = participantATotalSeconds <= participantBTotalSeconds
+      ? participantATotalSeconds
+      : participantBTotalSeconds;
+
+  if (turnLimitSeconds > shortestTotal) {
+    return invalidTurnLimitMessage;
+  }
+
+  if (overtimeEnabled && turnLimitSeconds >= shortestTotal) {
+    return invalidOvertimeWindowMessage;
+  }
+
+  if ((turnWarningEnabled && warningBeforeSeconds >= turnLimitSeconds) ||
+      (totalWarningEnabled && warningBeforeSeconds >= shortestTotal)) {
+    return invalidWarningBeforeMessage;
+  }
+
+  final effectivePenaltyEnabled = overtimeEnabled && penaltyEnabled;
+  if (effectivePenaltyEnabled) {
+    final maxPossibleOvertimeSeconds = shortestTotal - turnLimitSeconds;
+    if (maxPossibleOvertimeSeconds <= 0 ||
+        penaltyThresholdSeconds > maxPossibleOvertimeSeconds) {
+      return invalidPenaltyThresholdMessage;
+    }
+  }
+
+  final activeAlertTargetCount = _activeAlertTargetCount(
+    overtimeEnabled: overtimeEnabled,
+    penaltyEnabled: effectivePenaltyEnabled,
+    turnWarningEnabled: turnWarningEnabled,
+    totalWarningEnabled: totalWarningEnabled,
+    overtimeStartAlertEnabled: overtimeStartAlertEnabled,
+    penaltyAlertEnabled: penaltyAlertEnabled,
+  );
+  final activeAlertDeliveryCount = _activeAlertDeliveryCount(
+    visualEnabled: visualEnabled,
+    soundEnabled: soundEnabled,
+    hapticEnabled: hapticEnabled,
+  );
+
+  if (activeAlertTargetCount > 0 && activeAlertDeliveryCount == 0) {
+    return invalidAlertDeliveryMessage;
+  }
+
+  if (activeAlertTargetCount == 0 && activeAlertDeliveryCount > 0) {
+    return invalidAlertTargetMessage;
+  }
+
+  return null;
+}
+
+String? _validateSessionIdentities(SessionConfig config) {
+  if (config.participantA.id.isEmpty || config.participantB.id.isEmpty) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (config.participantA.id == config.participantB.id) {
+    return invalidSessionConfigMessage;
+  }
+
+  if (config.firstSpeakerId != config.participantA.id &&
+      config.firstSpeakerId != config.participantB.id) {
+    return invalidSessionConfigMessage;
+  }
+
+  return null;
+}
+
+String? _validateTotalSeconds(int seconds) {
+  if (seconds < minTotalMinutes * 60 ||
+      seconds > maxTotalMinutes * 60 ||
+      seconds % 60 != 0) {
+    return invalidTotalTimeRangeMessage;
+  }
+  return null;
+}
+
+String? _validateTurnLimitSeconds(int seconds) {
+  if (seconds < minTurnLimitMinutes * 60 ||
+      seconds > maxTurnLimitMinutes * 60 ||
+      seconds % 60 != 0) {
+    return invalidTurnLimitRangeMessage;
+  }
+  return null;
+}
+
+int _activeAlertTargetCount({
+  required bool overtimeEnabled,
+  required bool penaltyEnabled,
+  required bool turnWarningEnabled,
+  required bool totalWarningEnabled,
+  required bool overtimeStartAlertEnabled,
+  required bool penaltyAlertEnabled,
+}) {
+  var count = 0;
+  if (turnWarningEnabled) {
+    count += 1;
+  }
+  if (totalWarningEnabled) {
+    count += 1;
+  }
+  if (overtimeEnabled && overtimeStartAlertEnabled) {
+    count += 1;
+  }
+  if (overtimeEnabled && penaltyEnabled && penaltyAlertEnabled) {
+    count += 1;
+  }
+  return count;
+}
+
+int _activeAlertDeliveryCount({
+  required bool visualEnabled,
+  required bool soundEnabled,
+  required bool hapticEnabled,
+}) {
+  var count = 0;
+  if (visualEnabled) {
+    count += 1;
+  }
+  if (soundEnabled) {
+    count += 1;
+  }
+  if (hapticEnabled) {
+    count += 1;
+  }
+  return count;
 }
