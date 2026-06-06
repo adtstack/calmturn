@@ -1,11 +1,11 @@
 {
-  "name": "말차례 CalmTurn",
-  "short_name": "말차례",
+  "name": "시계 (부부싸움 시리즈)",
+  "short_name": "시계",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F6F4EF",
   "theme_color": "#2D6A64",
-  "description": "서로의 말할 시간을 지켜주는 대화 시계.",
-  "orientation": "portrait-primary",
+  "description": "부부싸움 중 서로의 발언 시간을 공평하게 나누는 대화 시계.",
+  "orientation": "landscape-primary",
   "prefer_related_applications": false
 }

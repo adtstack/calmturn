@@ -42,11 +42,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('설정'),
+        middle: const Text('고급설정'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
-          onPressed: widget.onBack,
-          child: const Text('대화 규칙으로'),
+          onPressed: _saveSettingsAndBack,
+          child: const Text('시계로'),
         ),
       ),
       child: SafeArea(
@@ -54,7 +54,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
             const Text(
-              '앱 설정',
+              '고급설정',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
@@ -283,10 +283,6 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            CupertinoButton.filled(
-              onPressed: _saveSettings,
-              child: const Text('설정 저장'),
-            ),
             if (_validationMessage != null) ...[
               const SizedBox(height: 12),
               ValidationNotice(_validationMessage!),
@@ -316,7 +312,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _saveSettings() {
+  void _saveSettingsAndBack() {
     final validationMessage = validateSessionSettingsDraft(_draft);
     if (validationMessage != null) {
       setState(() {
@@ -327,10 +323,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     widget.onSettingsChanged(_settings);
-    setState(() {
-      _validationMessage = null;
-      _statusMessage = '다음 대화에 사용할 설정을 저장했어요.';
-    });
+    widget.onBack();
   }
 
   Future<void> _clearRecords() async {

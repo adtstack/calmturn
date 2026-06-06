@@ -8,7 +8,7 @@ final _pubspecVersionPattern = RegExp(
 );
 
 void main() {
-  test('Android and web identity use the release Korean brand', () {
+  test('Android and web identity use the v4 Korean brand', () {
     final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File(
       'android/app/src/main/AndroidManifest.xml',
@@ -30,14 +30,14 @@ void main() {
       buildGradle,
       isNot(contains('signingConfig = signingConfigs.getByName("debug")')),
     );
-    expect(manifest, contains('android:label="말차례 CalmTurn"'));
+    expect(manifest, contains('android:label="시계 (부부싸움 시리즈)"'));
     expect(
       manifest,
       contains('android:icon="@drawable/ic_turn_ring_launcher"'),
     );
     expect(mainActivity, contains('package me.newlines.calmturn'));
-    expect(webManifest, contains('"name": "말차례 CalmTurn"'));
-    expect(webIndex, contains('<title>말차례 CalmTurn</title>'));
+    expect(webManifest, contains('"name": "시계 (부부싸움 시리즈)"'));
+    expect(webIndex, contains('<title>시계 (부부싸움 시리즈)</title>'));
   });
 
   test('Android launch art uses the turn ring concept', () {

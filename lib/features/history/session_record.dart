@@ -12,6 +12,25 @@ enum SessionEndReason {
   }
 }
 
+enum ConversationOutcome {
+  resolved,
+  unresolved;
+
+  String get label {
+    return switch (this) {
+      ConversationOutcome.resolved => '잘 마무리됨',
+      ConversationOutcome.unresolved => '아직 남음',
+    };
+  }
+
+  String get mark {
+    return switch (this) {
+      ConversationOutcome.resolved => 'O',
+      ConversationOutcome.unresolved => 'X',
+    };
+  }
+}
+
 final class SessionConfigSnapshot {
   final int turnLimitSeconds;
   final bool overtimeEnabled;
@@ -144,6 +163,9 @@ final class SessionRecord {
   final int totalBreakSeconds;
   final String? agreedNotes;
   final String? nextTopics;
+  final String? summaryText;
+  final String? tagsText;
+  final ConversationOutcome? outcome;
 
   const SessionRecord({
     required this.id,
@@ -156,6 +178,9 @@ final class SessionRecord {
     required this.totalBreakSeconds,
     this.agreedNotes,
     this.nextTopics,
+    this.summaryText,
+    this.tagsText,
+    this.outcome,
   });
 
   factory SessionRecord.fromTimerSnapshot({
@@ -169,6 +194,9 @@ final class SessionRecord {
     int totalBreakSeconds = 0,
     String? agreedNotes,
     String? nextTopics,
+    String? summaryText,
+    String? tagsText,
+    ConversationOutcome? outcome,
   }) {
     return SessionRecord(
       id: id,
@@ -183,6 +211,9 @@ final class SessionRecord {
       totalBreakSeconds: totalBreakSeconds,
       agreedNotes: _nullIfBlank(agreedNotes),
       nextTopics: _nullIfBlank(nextTopics),
+      summaryText: _nullIfBlank(summaryText),
+      tagsText: _nullIfBlank(tagsText),
+      outcome: outcome,
     );
   }
 
@@ -204,6 +235,9 @@ final class SessionRecord {
       totalBreakSeconds: json['totalBreakSeconds'] as int,
       agreedNotes: json['agreedNotes'] as String?,
       nextTopics: json['nextTopics'] as String?,
+      summaryText: json['summaryText'] as String?,
+      tagsText: json['tagsText'] as String?,
+      outcome: _outcomeFromJson(json['outcome'] as String?),
     );
   }
 
@@ -228,6 +262,9 @@ final class SessionRecord {
     int? totalBreakSeconds,
     String? agreedNotes,
     String? nextTopics,
+    String? summaryText,
+    String? tagsText,
+    ConversationOutcome? outcome,
   }) {
     return SessionRecord(
       id: id ?? this.id,
@@ -242,6 +279,9 @@ final class SessionRecord {
       totalBreakSeconds: totalBreakSeconds ?? this.totalBreakSeconds,
       agreedNotes: _nullIfBlank(agreedNotes) ?? this.agreedNotes,
       nextTopics: _nullIfBlank(nextTopics) ?? this.nextTopics,
+      summaryText: _nullIfBlank(summaryText) ?? this.summaryText,
+      tagsText: _nullIfBlank(tagsText) ?? this.tagsText,
+      outcome: outcome ?? this.outcome,
     );
   }
 
@@ -257,6 +297,31 @@ final class SessionRecord {
       totalBreakSeconds: totalBreakSeconds,
       agreedNotes: _nullIfBlank(agreedNotes),
       nextTopics: _nullIfBlank(nextTopics),
+      summaryText: summaryText,
+      tagsText: tagsText,
+      outcome: outcome,
+    );
+  }
+
+  SessionRecord withWrapUpDetails({
+    String? summaryText,
+    String? tagsText,
+    ConversationOutcome? outcome,
+  }) {
+    return SessionRecord(
+      id: id,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      endReason: endReason,
+      config: config,
+      participantResults: participantResults,
+      breakCount: breakCount,
+      totalBreakSeconds: totalBreakSeconds,
+      agreedNotes: agreedNotes,
+      nextTopics: nextTopics,
+      summaryText: _nullIfBlank(summaryText),
+      tagsText: _nullIfBlank(tagsText),
+      outcome: outcome,
     );
   }
 
@@ -274,8 +339,23 @@ final class SessionRecord {
       'totalBreakSeconds': totalBreakSeconds,
       'agreedNotes': agreedNotes,
       'nextTopics': nextTopics,
+      'summaryText': summaryText,
+      'tagsText': tagsText,
+      'outcome': outcome?.name,
     };
   }
+}
+
+ConversationOutcome? _outcomeFromJson(String? value) {
+  if (value == null) {
+    return null;
+  }
+  for (final outcome in ConversationOutcome.values) {
+    if (outcome.name == value) {
+      return outcome;
+    }
+  }
+  return null;
 }
 
 String newSessionRecordId(DateTime now) {

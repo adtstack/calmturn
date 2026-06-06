@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 import '../settings/session_setup_page.dart' show formatSeconds;
-import '../timer/domain/timer_models.dart';
 import 'session_record.dart';
 import 'session_record_store.dart';
 
@@ -17,23 +16,14 @@ final class HistoryScreen extends StatefulWidget {
 final class _HistoryScreenState extends State<HistoryScreen> {
   List<SessionRecord> _records = const [];
   bool _isLoading = true;
-  bool _isBusy = false;
-  String? _statusMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadRecords(showLoading: false);
+    _loadRecords();
   }
 
-  Future<void> _loadRecords({bool showLoading = true}) async {
-    if (showLoading) {
-      setState(() {
-        _isLoading = true;
-        _statusMessage = null;
-      });
-    }
-
+  Future<void> _loadRecords() async {
     final records = await widget.recordStore.load();
     if (!mounted) {
       return;
@@ -42,6 +32,92 @@ final class _HistoryScreenState extends State<HistoryScreen> {
       _records = records;
       _isLoading = false;
     });
+  }
+
+  Future<void> _openDay(DateTime day, List<SessionRecord> records) async {
+    final changed = await Navigator.of(context).push<bool>(
+      CupertinoPageRoute(
+        builder: (_) {
+          return HistoryDayScreen(
+            day: day,
+            records: records,
+            recordStore: widget.recordStore,
+          );
+        },
+      ),
+    );
+    if (changed == true) {
+      await _loadRecords();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = _groupByDay(_records);
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(middle: Text('기록 달력')),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
+          children: [
+            const Text(
+              '기록 달력',
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '날짜 아래에는 최근 결과가 최대 3개까지 표시됩니다.',
+              style: TextStyle(color: Color(0xFF5F6964)),
+            ),
+            const SizedBox(height: 18),
+            if (_isLoading)
+              const _StatusLine('기록을 불러오는 중이에요.')
+            else if (grouped.isEmpty)
+              const _StatusLine('저장된 기록이 아직 없어요.')
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: grouped.entries
+                    .map((entry) {
+                      return _CalendarDayCard(
+                        day: entry.key,
+                        records: entry.value,
+                        onTap: () => _openDay(entry.key, entry.value),
+                      );
+                    })
+                    .toList(growable: false),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final class HistoryDayScreen extends StatefulWidget {
+  final DateTime day;
+  final List<SessionRecord> records;
+  final SessionRecordStore recordStore;
+
+  const HistoryDayScreen({
+    super.key,
+    required this.day,
+    required this.records,
+    required this.recordStore,
+  });
+
+  @override
+  State<HistoryDayScreen> createState() => _HistoryDayScreenState();
+}
+
+final class _HistoryDayScreenState extends State<HistoryDayScreen> {
+  late List<SessionRecord> _records;
+
+  @override
+  void initState() {
+    super.initState();
+    _records = List<SessionRecord>.of(widget.records);
   }
 
   Future<void> _openRecord(SessionRecord record) async {
@@ -55,76 +131,36 @@ final class _HistoryScreenState extends State<HistoryScreen> {
         },
       ),
     );
-    if (!mounted) {
-      return;
-    }
-    if (deleted == true) {
+    if (deleted == true && mounted) {
       setState(() {
-        _statusMessage = '기록을 삭제했어요.';
+        _records = _records.where((item) => item.id != record.id).toList();
       });
-      await _loadRecords(showLoading: false);
+      Navigator.of(context).pop(true);
     }
-  }
-
-  Future<void> _clearRecords() async {
-    setState(() {
-      _isBusy = true;
-      _statusMessage = null;
-    });
-    await widget.recordStore.clear();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _records = const [];
-      _isBusy = false;
-      _statusMessage = '모든 기록을 삭제했어요.';
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(middle: Text('기록')),
+      navigationBar: const CupertinoNavigationBar(middle: Text('오늘의 기록')),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
           children: [
-            const Text(
-              '저장된 기록',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+            Text(
+              _isToday(widget.day) ? '오늘의 기록' : '${_dayLabel(widget.day)} 기록',
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              '이 기기에 저장된 대화 기록입니다.',
-              style: TextStyle(color: Color(0xFF5F6964)),
-            ),
-            const SizedBox(height: 18),
-            if (_isLoading)
-              const _StatusLine('기록을 불러오는 중이에요.')
-            else if (_records.isEmpty)
-              const _StatusLine('저장된 기록이 아직 없어요.')
-            else ...[
-              ..._records.map((record) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _SavedRecordSummaryCard(
-                    record: record,
-                    onTap: () => _openRecord(record),
-                  ),
-                );
-              }),
-              const SizedBox(height: 4),
-              CupertinoButton(
-                color: CupertinoColors.systemRed,
-                onPressed: _isBusy ? null : _clearRecords,
-                child: const Text('모든 기록 삭제'),
-              ),
-            ],
-            if (_statusMessage != null) ...[
-              const SizedBox(height: 12),
-              _StatusLine(_statusMessage!),
-            ],
+            const SizedBox(height: 16),
+            ..._records.map((record) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _DayRecordCard(
+                  record: record,
+                  onTap: () => _openRecord(record),
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -154,10 +190,9 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       _isBusy = true;
     });
     await widget.recordStore.delete(widget.record.id);
-    if (!mounted) {
-      return;
+    if (mounted) {
+      Navigator.of(context).pop(true);
     }
-    Navigator.of(context).pop(true);
   }
 
   @override
@@ -170,7 +205,7 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
           children: [
             Text(
-              record.title,
+              record.summaryText ?? record.title,
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -183,10 +218,9 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               child: _MetricGrid(
                 metrics: [
                   _MetricData('대화 시간', formatSeconds(record.durationSeconds)),
-                  _MetricData('종료', record.endReason.label),
+                  _MetricData('결과', record.outcome?.label ?? '기록 없음'),
                   _MetricData('휴식', record.breakCount.toString()),
                   _MetricData('휴식 시간', formatSeconds(record.totalBreakSeconds)),
-                  _MetricData('주의 표시', _penaltyTotal(record).toString()),
                 ],
               ),
             ),
@@ -196,35 +230,15 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '설정값',
+                    '기록',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 12),
-                  _MetricGrid(
-                    metrics: [
-                      _MetricData(
-                        '턴 제한',
-                        formatSeconds(record.config.turnLimitSeconds),
-                      ),
-                      _MetricData(
-                        '오버타임',
-                        _onOff(record.config.overtimeEnabled),
-                      ),
-                      _MetricData(
-                        '오버타임 표시',
-                        _onOff(record.config.showOvertime),
-                      ),
-                      _MetricData(
-                        '주의 기준',
-                        formatSeconds(record.config.overtimeThresholdSeconds),
-                      ),
-                      _MetricData(
-                        '주의 반복',
-                        _penaltyRepeatLabel(record.config.penaltyRepeatMode),
-                      ),
-                      _MetricData('알림', record.config.alertChannels),
-                    ],
-                  ),
+                  _FieldLabel('총평'),
+                  Text(record.summaryText ?? '총평이 없어요.'),
+                  const SizedBox(height: 10),
+                  _FieldLabel('해시태그'),
+                  Text(record.tagsText ?? '해시태그가 없어요.'),
                 ],
               ),
             ),
@@ -235,8 +249,6 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 child: _ParticipantDetailCard(participant: participant),
               );
             }),
-            _NotesCard(record: record),
-            const SizedBox(height: 14),
             CupertinoButton(
               color: CupertinoColors.systemRed,
               onPressed: _isBusy ? null : _deleteRecord,
@@ -249,43 +261,98 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   }
 }
 
-final class _SavedRecordSummaryCard extends StatelessWidget {
-  final SessionRecord record;
+final class _CalendarDayCard extends StatelessWidget {
+  final DateTime day;
+  final List<SessionRecord> records;
   final VoidCallback onTap;
 
-  const _SavedRecordSummaryCard({required this.record, required this.onTap});
+  const _CalendarDayCard({
+    required this.day,
+    required this.records,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '${record.title} 기록 자세히 보기',
+    final marks = List<SessionRecord>.of(records)
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    final markText = marks
+        .take(3)
+        .map((record) => record.outcome?.mark ?? '-')
+        .join(' ');
+    return SizedBox(
+      width: 104,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: _Card(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                record.title,
+                _dayLabel(day),
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(_formatDateTime(record.startedAt)),
-              const SizedBox(height: 10),
-              _MetricGrid(
-                metrics: [
-                  _MetricData('대화 시간', formatSeconds(record.durationSeconds)),
-                  _MetricData('종료', record.endReason.label),
-                  _MetricData('휴식', record.breakCount.toString()),
-                  _MetricData('주의 표시', _penaltyTotal(record).toString()),
-                ],
+              const SizedBox(height: 8),
+              Text(
+                markText,
+                maxLines: 1,
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _DayRecordCard extends StatelessWidget {
+  final SessionRecord record;
+  final VoidCallback onTap;
+
+  const _DayRecordCard({required this.record, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  _timeLabel(record.startedAt),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const Spacer(),
+                Text(
+                  record.outcome?.mark ?? '-',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              record.summaryText ?? record.title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            if (record.tagsText != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                record.tagsText!,
+                style: const TextStyle(color: Color(0xFF5F6964)),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -327,46 +394,8 @@ final class _ParticipantDetailCard extends StatelessWidget {
                 '오버타임 합계',
                 formatSeconds(participant.overtimeTotalSeconds),
               ),
-              _MetricData('주의 표시', participant.penaltyCount.toString()),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _NotesCard extends StatelessWidget {
-  final SessionRecord record;
-
-  const _NotesCard({required this.record});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasAgreedNotes = record.agreedNotes != null;
-    final hasNextTopics = record.nextTopics != null;
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '메모',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          if (!hasAgreedNotes && !hasNextTopics)
-            const Text('메모가 없어요.')
-          else ...[
-            if (hasAgreedNotes) ...[
-              const _FieldLabel('합의한 것'),
-              Text(record.agreedNotes!),
-            ],
-            if (hasNextTopics) ...[
-              if (hasAgreedNotes) const SizedBox(height: 10),
-              const _FieldLabel('다음에 이야기할 것'),
-              Text(record.nextTopics!),
-            ],
-          ],
         ],
       ),
     );
@@ -479,6 +508,32 @@ final class _StatusLine extends StatelessWidget {
   }
 }
 
+Map<DateTime, List<SessionRecord>> _groupByDay(List<SessionRecord> records) {
+  final grouped = <DateTime, List<SessionRecord>>{};
+  for (final record in records) {
+    final local = record.startedAt.toLocal();
+    final day = DateTime(local.year, local.month, local.day);
+    grouped.putIfAbsent(day, () => []).add(record);
+  }
+  final sortedEntries = grouped.entries.toList()
+    ..sort((a, b) => b.key.compareTo(a.key));
+  return Map<DateTime, List<SessionRecord>>.fromEntries(sortedEntries);
+}
+
+bool _isToday(DateTime day) {
+  final now = DateTime.now();
+  return day.year == now.year && day.month == now.month && day.day == now.day;
+}
+
+String _dayLabel(DateTime value) {
+  return '${value.month}/${value.day}';
+}
+
+String _timeLabel(DateTime value) {
+  final local = value.toLocal();
+  return '${_two(local.hour)}:${_two(local.minute)}';
+}
+
 String _formatDateTime(DateTime value) {
   final local = value.toLocal();
   return '${local.year}-${_two(local.month)}-${_two(local.day)} '
@@ -487,22 +542,4 @@ String _formatDateTime(DateTime value) {
 
 String _two(int value) {
   return value.toString().padLeft(2, '0');
-}
-
-String _onOff(bool value) {
-  return value ? '켜짐' : '꺼짐';
-}
-
-String _penaltyRepeatLabel(PenaltyRepeatMode mode) {
-  return switch (mode) {
-    PenaltyRepeatMode.oncePerTurn => '차례당 1회',
-    PenaltyRepeatMode.everyThreshold => '기준마다',
-  };
-}
-
-int _penaltyTotal(SessionRecord record) {
-  return record.participantResults.fold<int>(
-    0,
-    (total, participant) => total + participant.penaltyCount,
-  );
 }

@@ -20,6 +20,9 @@ void main() {
         breakCount: 2,
         agreedNotes: 'Use shorter examples.',
         nextTopics: 'Budget follow-up.',
+        summaryText: 'We slowed down after the first topic.',
+        tagsText: '#money #tone',
+        outcome: ConversationOutcome.resolved,
       );
 
       _expect(record.title == 'A / B', 'record title should use names');
@@ -38,6 +41,15 @@ void main() {
         'agreed notes mismatch',
       );
       _expect(record.nextTopics == 'Budget follow-up.', 'next topics mismatch');
+      _expect(
+        record.summaryText == 'We slowed down after the first topic.',
+        'summary mismatch',
+      );
+      _expect(record.tagsText == '#money #tone', 'tags mismatch');
+      _expect(
+        record.outcome == ConversationOutcome.resolved,
+        'outcome mismatch',
+      );
 
       final participantA = record.participantResults.first;
       _expect(participantA.name == 'A', 'participant A name mismatch');
@@ -88,6 +100,9 @@ void main() {
         breakCount: 1,
         agreedNotes: 'Keep the first topic.',
         nextTopics: 'Decide next weekend.',
+        summaryText: 'A calmer finish.',
+        tagsText: '#weekend',
+        outcome: ConversationOutcome.unresolved,
       );
 
       final decoded = SessionRecord.fromJson(record.toJson());
@@ -123,6 +138,38 @@ void main() {
         decoded.nextTopics == record.nextTopics,
         'topics should round trip',
       );
+      _expect(
+        decoded.summaryText == record.summaryText,
+        'summary should round trip',
+      );
+      _expect(decoded.tagsText == record.tagsText, 'tags should round trip');
+      _expect(
+        decoded.outcome == ConversationOutcome.unresolved,
+        'outcome should round trip',
+      );
+    },
+
+    'session record reads legacy json without wrap up outcome fields': () {
+      final config = _config();
+      final record = SessionRecord.fromTimerSnapshot(
+        id: 'legacy-record',
+        config: config,
+        snapshot: TimerEngine.start(config).snapshot(),
+        startedAt: DateTime.utc(2026, 5, 15, 11),
+        endedAt: DateTime.utc(2026, 5, 15, 11, 5),
+        endReason: SessionEndReason.endedByUser,
+        breakCount: 0,
+      );
+      final json = record.toJson()
+        ..remove('summaryText')
+        ..remove('tagsText')
+        ..remove('outcome');
+
+      final decoded = SessionRecord.fromJson(json);
+
+      _expect(decoded.summaryText == null, 'legacy summary should be null');
+      _expect(decoded.tagsText == null, 'legacy tags should be null');
+      _expect(decoded.outcome == null, 'legacy outcome should be null');
     },
   };
 

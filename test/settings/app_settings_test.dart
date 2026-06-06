@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:calmturn/features/settings/app_settings.dart';
 import 'package:calmturn/features/settings/app_settings_storage_io.dart';
+import 'package:calmturn/features/settings/session_settings.dart';
 import 'package:calmturn/features/timer/domain/timer_models.dart';
 
 Future<void> main() async {
@@ -46,6 +47,21 @@ Future<void> main() async {
 
       final loaded = await store.loadSessionConfig();
       _expect(loaded == null, 'stored config should clear');
+    },
+    'json app settings store saves and loads the full app settings': () async {
+      final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+      final settings = AppSettingsDraft(
+        sessionDefaults: SessionSettingsDraft.fromSessionConfig(_config()),
+        autoSaveRecords: true,
+      );
+
+      await store.saveSettings(settings);
+
+      final loaded = await store.loadSettings();
+      _expectEquals(loaded.autoSaveRecords, true);
+      _expectEquals(loaded.sessionDefaults.participantAName, 'A');
+      _expectEquals(loaded.sessionDefaults.participantBName, 'B');
+      _expectEquals(loaded.sessionDefaults.turnLimitSeconds, 60);
     },
     'json app settings store ignores corrupt settings': () async {
       final storage = InMemoryAppSettingsStorage();

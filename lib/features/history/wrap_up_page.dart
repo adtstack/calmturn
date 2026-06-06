@@ -8,12 +8,14 @@ import 'session_record_store.dart';
 final class WrapUpPage extends StatefulWidget {
   final SessionRecord draftRecord;
   final SessionRecordStore recordStore;
+  final bool recordWasAutoSaved;
   final VoidCallback onStartAnotherSession;
 
   const WrapUpPage({
     super.key,
     required this.draftRecord,
     required this.recordStore,
+    this.recordWasAutoSaved = false,
     required this.onStartAnotherSession,
   });
 
@@ -22,26 +24,26 @@ final class WrapUpPage extends StatefulWidget {
 }
 
 final class _WrapUpPageState extends State<WrapUpPage> {
-  late final TextEditingController _agreedNotesController;
-  late final TextEditingController _nextTopicsController;
+  late final TextEditingController _summaryController;
+  late final TextEditingController _tagsController;
+  ConversationOutcome _outcome = ConversationOutcome.resolved;
   String? _statusMessage;
   bool _isBusy = false;
 
   @override
   void initState() {
     super.initState();
-    _agreedNotesController = TextEditingController(
-      text: widget.draftRecord.agreedNotes,
+    _summaryController = TextEditingController(
+      text: widget.draftRecord.summaryText,
     );
-    _nextTopicsController = TextEditingController(
-      text: widget.draftRecord.nextTopics,
-    );
+    _tagsController = TextEditingController(text: widget.draftRecord.tagsText);
+    _outcome = widget.draftRecord.outcome ?? ConversationOutcome.resolved;
   }
 
   @override
   void dispose() {
-    _agreedNotesController.dispose();
-    _nextTopicsController.dispose();
+    _summaryController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -50,9 +52,10 @@ final class _WrapUpPageState extends State<WrapUpPage> {
       _isBusy = true;
       _statusMessage = null;
     });
-    final record = widget.draftRecord.withNotes(
-      agreedNotes: _agreedNotesController.text,
-      nextTopics: _nextTopicsController.text,
+    final record = widget.draftRecord.withWrapUpDetails(
+      summaryText: _summaryController.text,
+      tagsText: _tagsController.text,
+      outcome: _outcome,
     );
     await widget.recordStore.save(record);
     if (!mounted) {
@@ -64,8 +67,19 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     });
   }
 
-  void _finishWithoutSaving() {
+  Future<void> _finishWithoutSaving() async {
     setState(() {
+      _isBusy = true;
+      _statusMessage = null;
+    });
+    if (widget.recordWasAutoSaved) {
+      await widget.recordStore.delete(widget.draftRecord.id);
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isBusy = false;
       _statusMessage = '기록하지 않고 마쳤어요.';
     });
   }
@@ -111,8 +125,14 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             }),
             const SizedBox(height: 12),
             _NotesSection(
-              agreedNotesController: _agreedNotesController,
-              nextTopicsController: _nextTopicsController,
+              summaryController: _summaryController,
+              tagsController: _tagsController,
+              outcome: _outcome,
+              onOutcomeChanged: (outcome) {
+                setState(() {
+                  _outcome = outcome;
+                });
+              },
             ),
             const SizedBox(height: 14),
             CupertinoButton.filled(
@@ -121,7 +141,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             ),
             const SizedBox(height: 10),
             CupertinoButton(
-              onPressed: _finishWithoutSaving,
+              onPressed: _isBusy ? null : _finishWithoutSaving,
               child: const Text('저장하지 않고 마치기'),
             ),
             CupertinoButton(
@@ -135,7 +155,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             const SizedBox(height: 16),
             CupertinoButton(
               onPressed: _openHistory,
-              child: const Text('저장된 기록 보기'),
+              child: const Text('기록 보기'),
             ),
           ],
         ),
@@ -210,7 +230,6 @@ final class _ParticipantResultCard extends StatelessWidget {
                 '오버타임 합계',
                 formatSeconds(participant.overtimeTotalSeconds),
               ),
-              _MetricData('주의 표시', participant.penaltyCount.toString()),
             ],
           ),
         ],
@@ -220,12 +239,16 @@ final class _ParticipantResultCard extends StatelessWidget {
 }
 
 final class _NotesSection extends StatelessWidget {
-  final TextEditingController agreedNotesController;
-  final TextEditingController nextTopicsController;
+  final TextEditingController summaryController;
+  final TextEditingController tagsController;
+  final ConversationOutcome outcome;
+  final ValueChanged<ConversationOutcome> onOutcomeChanged;
 
   const _NotesSection({
-    required this.agreedNotesController,
-    required this.nextTopicsController,
+    required this.summaryController,
+    required this.tagsController,
+    required this.outcome,
+    required this.onOutcomeChanged,
   });
 
   @override
@@ -235,27 +258,70 @@ final class _NotesSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '메모',
+            '기록',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
-          const _FieldLabel('합의한 것'),
+          const _FieldLabel('총평'),
           CupertinoTextField(
-            controller: agreedNotesController,
+            key: const ValueKey('summary-text-field'),
+            controller: summaryController,
             minLines: 2,
             maxLines: 4,
-            placeholder: '함께 정한 내용을 적어두세요',
+            placeholder: '대화를 짧게 정리해두세요',
           ),
           const SizedBox(height: 12),
-          const _FieldLabel('다음에 이야기할 것'),
+          const _FieldLabel('해시태그'),
           CupertinoTextField(
-            controller: nextTopicsController,
-            minLines: 2,
-            maxLines: 4,
-            placeholder: '다음 대화로 넘길 주제를 적어두세요',
+            key: const ValueKey('tags-text-field'),
+            controller: tagsController,
+            minLines: 1,
+            maxLines: 2,
+            placeholder: '#감정 #생활비',
           ),
+          const SizedBox(height: 12),
+          _OutcomeSelector(outcome: outcome, onChanged: onOutcomeChanged),
         ],
       ),
+    );
+  }
+}
+
+final class _OutcomeSelector extends StatelessWidget {
+  final ConversationOutcome outcome;
+  final ValueChanged<ConversationOutcome> onChanged;
+
+  const _OutcomeSelector({required this.outcome, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: ConversationOutcome.values
+          .map((value) {
+            final selected = value == outcome;
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: CupertinoButton(
+                  color: selected
+                      ? const Color(0xFF111111)
+                      : const Color(0xFFE9E9E4),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  onPressed: () => onChanged(value),
+                  child: Text(
+                    value.label,
+                    style: TextStyle(
+                      color: selected
+                          ? CupertinoColors.white
+                          : const Color(0xFF111111),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }

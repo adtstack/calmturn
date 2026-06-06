@@ -80,13 +80,13 @@ final class SessionSettingsDraft {
 
   factory SessionSettingsDraft.defaults() {
     return const SessionSettingsDraft(
-      participantAName: '',
-      participantBName: '',
+      participantAName: '남편',
+      participantBName: '와이프',
       totalTimeMode: TotalTimeMode.same,
-      sharedTotalSeconds: 300,
-      participantATotalSeconds: 300,
-      participantBTotalSeconds: 300,
-      turnLimitSeconds: 60,
+      sharedTotalSeconds: 600,
+      participantATotalSeconds: 600,
+      participantBTotalSeconds: 600,
+      turnLimitSeconds: 180,
       firstSpeakerId: participantAId,
       overtimeEnabled: true,
       showOvertime: true,
@@ -104,6 +104,42 @@ final class SessionSettingsDraft {
       hapticEnabled: true,
       soundType: 'soft',
       hapticStrength: 'medium',
+    );
+  }
+
+  factory SessionSettingsDraft.fromSessionConfig(SessionConfig config) {
+    final sameTotal =
+        config.participantA.totalAllocatedSeconds ==
+        config.participantB.totalAllocatedSeconds;
+    return SessionSettingsDraft.defaults().copyWith(
+      participantAName: config.participantA.name,
+      participantBName: config.participantB.name,
+      totalTimeMode: sameTotal
+          ? TotalTimeMode.same
+          : TotalTimeMode.customPerParticipant,
+      sharedTotalSeconds: sameTotal
+          ? config.participantA.totalAllocatedSeconds
+          : SessionSettingsDraft.defaults().sharedTotalSeconds,
+      participantATotalSeconds: config.participantA.totalAllocatedSeconds,
+      participantBTotalSeconds: config.participantB.totalAllocatedSeconds,
+      turnLimitSeconds: config.turnLimitSeconds,
+      firstSpeakerId: config.firstSpeakerId,
+      overtimeEnabled: config.overtimeConfig.enabled,
+      showOvertime: config.overtimeConfig.showOvertime,
+      penaltyEnabled: config.penaltyConfig.enabled,
+      penaltyThresholdSeconds: config.penaltyConfig.thresholdSeconds,
+      penaltyRepeatMode: config.penaltyConfig.repeatMode,
+      penaltyLabelMode: config.penaltyConfig.labelMode,
+      warningBeforeSeconds: config.alertConfig.warningBeforeSeconds,
+      turnWarningEnabled: config.alertConfig.turnWarningEnabled,
+      totalWarningEnabled: config.alertConfig.totalWarningEnabled,
+      overtimeStartAlertEnabled: config.alertConfig.overtimeStartAlertEnabled,
+      penaltyAlertEnabled: config.alertConfig.penaltyAlertEnabled,
+      visualEnabled: config.alertConfig.visualEnabled,
+      soundEnabled: config.alertConfig.soundEnabled,
+      hapticEnabled: config.alertConfig.hapticEnabled,
+      soundType: config.alertConfig.soundType,
+      hapticStrength: config.alertConfig.hapticStrength,
     );
   }
 

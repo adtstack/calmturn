@@ -3,14 +3,14 @@ import 'package:calmturn/features/timer/domain/timer_models.dart';
 
 void main() {
   final tests = <String, void Function()>{
-    'default draft builds the MVP session config': () {
+    'default draft builds the v4 session config': () {
       final config = SessionSettingsDraft.defaults().toSessionConfig();
 
-      _expectEquals(config.participantA.name, '말하는 사람 A');
-      _expectEquals(config.participantB.name, '말하는 사람 B');
-      _expectEquals(config.participantA.totalAllocatedSeconds, 300);
-      _expectEquals(config.participantB.totalAllocatedSeconds, 300);
-      _expectEquals(config.turnLimitSeconds, 60);
+      _expectEquals(config.participantA.name, '남편');
+      _expectEquals(config.participantB.name, '와이프');
+      _expectEquals(config.participantA.totalAllocatedSeconds, 600);
+      _expectEquals(config.participantB.totalAllocatedSeconds, 600);
+      _expectEquals(config.turnLimitSeconds, 180);
       _expectEquals(config.firstSpeakerId, 'a');
       _expectEquals(config.penaltyConfig.thresholdSeconds, 60);
       _expectEquals(config.alertConfig.warningBeforeSeconds, 10);

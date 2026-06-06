@@ -12,6 +12,7 @@ import 'features/settings/app_settings_platform_storage_stub.dart'
     if (dart.library.io) 'features/settings/app_settings_platform_storage_io.dart'
     as platform_storage;
 import 'features/settings/session_setup_page.dart';
+import 'features/settings/session_settings.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/timer/domain/timer_engine.dart';
 import 'features/timer/domain/timer_models.dart';
@@ -32,7 +33,7 @@ final class CalmTurnApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       debugShowCheckedModeBanner: false,
-      title: '말차례 CalmTurn',
+      title: '시계 (부부싸움 시리즈)',
       theme: const CupertinoThemeData(
         brightness: Brightness.light,
         primaryColor: Color(0xFF2D6A64),
@@ -81,29 +82,34 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
   }
 
   Future<void> _loadSettings() async {
-    SessionConfig? config;
+    AppSettingsDraft settings;
     try {
-      config = await _settingsStore.loadSessionConfig();
+      settings = await _settingsStore.loadSettings();
     } catch (_) {
-      config = null;
+      settings = AppSettingsDraft.defaults();
     }
     if (!mounted) {
       return;
     }
     setState(() {
-      _sessionConfig = config;
+      _sessionConfig = null;
+      _appSettings = settings;
       _isLoadingSettings = false;
     });
   }
 
   Future<void> _acceptSession(SessionConfig acceptedConfig) async {
+    final acceptedSettings = _appSettings.copyWith(
+      sessionDefaults: SessionSettingsDraft.fromSessionConfig(acceptedConfig),
+    );
     try {
-      await _settingsStore.saveSessionConfig(acceptedConfig);
+      await _settingsStore.saveSettings(acceptedSettings);
     } catch (_) {}
     if (!mounted) {
       return;
     }
     setState(() {
+      _appSettings = acceptedSettings;
       _sessionConfig = acceptedConfig;
     });
   }
@@ -134,6 +140,7 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
           setState(() {
             _appSettings = settings;
           });
+          unawaited(_settingsStore.saveSettings(settings));
         },
         onBack: () {
           setState(() {
@@ -318,14 +325,37 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     }
   }
 
-  void _addMinute() {
-    _commit(_engine.addTime(_snapshot.activeParticipantId, 60));
-    if (_isRunningPhase) {
-      _startTicker();
+  Future<void> _confirmFinish() async {
+    final shouldFinish = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text('종료할까요?'),
+          content: const Text('지금 대화를 종료하고 마무리 화면으로 이동합니다.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('취소'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('종료'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldFinish == true && mounted) {
+      await _finish();
     }
   }
 
-  void _finish() {
+  Future<void> _finish() async {
     final endedAt = DateTime.now();
     final endReason = _snapshot.phase == TimerPhase.needsExtension
         ? SessionEndReason.timeEnded
@@ -343,9 +373,14 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       totalBreakSeconds: _totalBreakSeconds,
     );
     if (widget.autoSaveRecords) {
-      unawaited(_recordStore.save(record));
+      try {
+        await _recordStore.save(record);
+      } catch (_) {}
     }
     _stopTicker();
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _feedbackCues = const [];
       _wrapUpRecord = record;
@@ -376,6 +411,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       return WrapUpPage(
         draftRecord: wrapUpRecord,
         recordStore: _recordStore,
+        recordWasAutoSaved: widget.autoSaveRecords,
         onStartAnotherSession: _reset,
       );
     }
@@ -393,62 +429,45 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       child: SafeArea(
         child: Stack(
           children: [
-            Column(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: _FaceTimerZone(
-                    key: const ValueKey('face-timer-top-zone'),
-                    rotationKey: const ValueKey('face-timer-top-rotation'),
-                    participant: participantB,
-                    snapshot: snapshot,
-                    feedbackCues: _feedbackCues,
-                    showOvertime: showOvertime,
-                    canResume: canResume,
-                    isRotated: true,
-                    onPassTurn: canPass ? _passTurn : null,
-                  ),
-                ),
-                Expanded(
-                  child: _FaceTimerZone(
-                    key: const ValueKey('face-timer-bottom-zone'),
+                Flexible(
+                  flex: _panelFlex(participantA),
+                  child: _ClockPanel(
+                    key: const ValueKey('clock-left-zone'),
                     participant: participantA,
                     snapshot: snapshot,
                     feedbackCues: _feedbackCues,
                     showOvertime: showOvertime,
                     canResume: canResume,
-                    isRotated: false,
+                    isDark: false,
+                    onPassTurn: canPass ? _passTurn : null,
+                  ),
+                ),
+                Flexible(
+                  flex: _panelFlex(participantB),
+                  child: _ClockPanel(
+                    key: const ValueKey('clock-right-zone'),
+                    participant: participantB,
+                    snapshot: snapshot,
+                    feedbackCues: _feedbackCues,
+                    showOvertime: showOvertime,
+                    canResume: canResume,
+                    isDark: true,
                     onPassTurn: canPass ? _passTurn : null,
                   ),
                 ),
               ],
             ),
-            Align(
-              alignment: Alignment.center,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 390),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFAFAF7),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFD4CEC2)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: _Controls(
-                        phase: snapshot.phase,
-                        canResume: canResume,
-                        canPass: canPass,
-                        onBreakOrResume: _takeBreakOrResume,
-                        onPassTurn: _passTurn,
-                        onAddMinute: _addMinute,
-                        onFinish: _finish,
-                        onRestart: _reset,
-                      ),
-                    ),
-                  ),
-                ),
+            Positioned(
+              top: 14,
+              right: 14,
+              child: _ClockControls(
+                phase: snapshot.phase,
+                canResume: canResume,
+                onPauseOrResume: _takeBreakOrResume,
+                onFinish: _confirmFinish,
               ),
             ),
           ],
@@ -462,160 +481,50 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 }
 
-final class _FaceTimerZone extends StatelessWidget {
-  final Key? rotationKey;
+int _panelFlex(Participant participant) {
+  return math.max(1, participant.totalRemainingSeconds);
+}
+
+final class _ClockPanel extends StatelessWidget {
   final Participant participant;
   final TimerSnapshot snapshot;
   final List<TimerFeedbackCue> feedbackCues;
   final bool showOvertime;
   final bool canResume;
-  final bool isRotated;
+  final bool isDark;
   final VoidCallback? onPassTurn;
 
-  const _FaceTimerZone({
+  const _ClockPanel({
     super.key,
-    this.rotationKey,
     required this.participant,
     required this.snapshot,
     required this.feedbackCues,
     required this.showOvertime,
     required this.canResume,
-    required this.isRotated,
+    required this.isDark,
     required this.onPassTurn,
   });
 
   @override
   Widget build(BuildContext context) {
     final isActive = participant.id == snapshot.activeParticipantId;
-    final isOvertime = snapshot.phase == TimerPhase.runningOvertime;
-    final isAutoPaused = snapshot.phase == TimerPhase.paused && !canResume;
-    final needsTurnLimitTone = isActive && (isOvertime || isAutoPaused);
-    final turnTime = isOvertime
-        ? showOvertime
-              ? '+${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
-              : '차례 시간이 끝났어요'
-        : formatSeconds(snapshot.currentTurnRemainingSeconds);
-    final primaryTime = isActive
-        ? turnTime
+    final isOvertime = snapshot.phase == TimerPhase.runningOvertime && isActive;
+    final foreground = isDark ? CupertinoColors.white : const Color(0xFF111111);
+    final muted = isDark ? const Color(0xFFC9C9C9) : const Color(0xFF5F6460);
+    final background = isDark
+        ? const Color(0xFF171717)
+        : const Color(0xFFF7F7F4);
+    final timeText = isActive
+        ? isOvertime
+              ? showOvertime
+                    ? '오버타임 +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
+                    : '차례 종료'
+              : formatSeconds(snapshot.currentTurnRemainingSeconds)
         : formatSeconds(participant.totalRemainingSeconds);
-    final content = LayoutBuilder(
-      builder: (context, constraints) {
-        const horizontalPadding = 22.0;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            horizontalPadding,
-            14,
-            horizontalPadding,
-            14,
-          ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: SizedBox(
-                width: math.max(
-                  0,
-                  constraints.maxWidth - horizontalPadding * 2,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      isActive ? '지금 말하는 중' : '듣는 시간',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isActive
-                            ? const Color(0xFF2D6A64)
-                            : const Color(0xFF646B66),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      isActive
-                          ? _headline(
-                              snapshot.phase,
-                              participant.name,
-                              canResume: canResume,
-                            )
-                          : '${participant.name}님은 듣는 중',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      primaryTime,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: needsTurnLimitTone
-                            ? const Color(0xFF8A5A13)
-                            : const Color(0xFF1C2523),
-                        fontSize: isActive && isOvertime && !showOvertime
-                            ? 38
-                            : 62,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _Metric(
-                            label: '전체 남은 시간',
-                            value: formatSeconds(
-                              participant.totalRemainingSeconds,
-                            ),
-                            align: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _Metric(
-                            label: isActive ? '이번 차례' : '대기 중',
-                            value: isActive
-                                ? formatSeconds(
-                                    snapshot.currentTurnRemainingSeconds,
-                                  )
-                                : '듣는 중',
-                            align: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (isActive &&
-                        showOvertime &&
-                        (snapshot.phase == TimerPhase.runningOvertime ||
-                            snapshot.currentTurnOvertimeSeconds > 0)) ...[
-                      const SizedBox(height: 8),
-                      Center(
-                        child: _NoticeLine(
-                          '오버타임 +${formatSeconds(snapshot.currentTurnOvertimeSeconds)}',
-                        ),
-                      ),
-                    ],
-                    if (isActive && feedbackCues.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      _FeedbackBanner(cues: feedbackCues),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    final rotatedContent = isRotated
-        ? Transform.rotate(key: rotationKey, angle: math.pi, child: content)
-        : content;
 
     return Semantics(
       button: onPassTurn != null,
-      label: _timerSemanticsLabel(
+      label: _clockSemanticsLabel(
         participant: participant,
         snapshot: snapshot,
         isActive: isActive,
@@ -627,31 +536,148 @@ final class _FaceTimerZone extends StatelessWidget {
         onTap: onPassTurn,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: _zoneColor(isActive, needsTurnLimitTone),
+            color: background,
             border: Border(
-              bottom: isRotated
-                  ? const BorderSide(color: Color(0xFFCEC8BA), width: 1)
-                  : BorderSide.none,
-              top: isRotated
+              right: isDark
                   ? BorderSide.none
-                  : const BorderSide(color: Color(0xFFCEC8BA), width: 1),
+                  : const BorderSide(color: Color(0xFFE1E1DC)),
             ),
           ),
-          child: rotatedContent,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 54, 18, 28),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(
+                  width: 360,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        participant.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: foreground,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Text(
+                        timeText,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: foreground,
+                          fontSize: isOvertime && showOvertime ? 58 : 82,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        _panelStatus(
+                          participant,
+                          snapshot,
+                          isActive: isActive,
+                          canResume: canResume,
+                        ),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (isActive && feedbackCues.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _FeedbackBanner(cues: feedbackCues),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-Color _zoneColor(bool isActive, bool needsTurnLimitTone) {
-  if (needsTurnLimitTone) {
-    return const Color(0xFFFFF0CC);
+final class _ClockControls extends StatelessWidget {
+  final TimerPhase phase;
+  final bool canResume;
+  final VoidCallback onPauseOrResume;
+  final VoidCallback onFinish;
+
+  const _ClockControls({
+    required this.phase,
+    required this.canResume,
+    required this.onPauseOrResume,
+    required this.onFinish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canPause =
+        phase == TimerPhase.runningNormal ||
+        phase == TimerPhase.runningOvertime ||
+        (phase == TimerPhase.paused && canResume);
+    final isPaused = phase == TimerPhase.paused;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CupertinoButton(
+          color: const Color(0xFF303030),
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          onPressed: canPause ? onPauseOrResume : null,
+          child: Text(
+            isPaused && canResume ? '재개' : '일시정지',
+            style: const TextStyle(
+              color: CupertinoColors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        CupertinoButton(
+          color: const Color(0xFF303030),
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          onPressed: phase == TimerPhase.finished ? null : onFinish,
+          child: const Text(
+            '종료',
+            style: TextStyle(
+              color: CupertinoColors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
   }
-  return isActive ? const Color(0xFFBEDDD2) : const Color(0xFFF8F6F0);
 }
 
-String _timerSemanticsLabel({
+String _panelStatus(
+  Participant participant,
+  TimerSnapshot snapshot, {
+  required bool isActive,
+  required bool canResume,
+}) {
+  if (snapshot.phase == TimerPhase.paused && canResume) {
+    return '잠깐 멈춤';
+  }
+  if (snapshot.phase == TimerPhase.needsExtension && isActive) {
+    return '전체 시간이 끝났어요';
+  }
+  if (isActive) {
+    return '말하는 중 · 전체 ${formatSeconds(participant.totalRemainingSeconds)}';
+  }
+  return '듣는 중';
+}
+
+String _clockSemanticsLabel({
   required Participant participant,
   required TimerSnapshot snapshot,
   required bool isActive,
@@ -659,168 +685,24 @@ String _timerSemanticsLabel({
   required bool canResume,
 }) {
   final parts = <String>[
-    '${participant.name} 타이머 영역',
+    participant.name,
     isActive ? '말하는 중' : '듣는 중',
-    if (isActive)
-      _headline(snapshot.phase, participant.name, canResume: canResume),
-    if (isActive && snapshot.phase == TimerPhase.runningOvertime)
-      showOvertime
-          ? '오버타임 ${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
-          : '차례 시간이 끝남',
     '전체 남은 시간 ${formatSeconds(participant.totalRemainingSeconds)}',
-    if (isActive)
-      '이번 차례 ${formatSeconds(snapshot.currentTurnRemainingSeconds)}',
-    if (participant.penaltyCount > 0) '주의 표시 ${participant.penaltyCount}회',
   ];
+  if (isActive) {
+    parts.add('이번 차례 ${formatSeconds(snapshot.currentTurnRemainingSeconds)}');
+    if (snapshot.phase == TimerPhase.paused && canResume) {
+      parts.add('잠깐 멈춤');
+    }
+    if (snapshot.phase == TimerPhase.runningOvertime) {
+      parts.add(
+        showOvertime
+            ? '오버타임 ${formatSeconds(snapshot.currentTurnOvertimeSeconds)}'
+            : '차례 종료',
+      );
+    }
+  }
   return parts.join(', ');
-}
-
-final class _Metric extends StatelessWidget {
-  final String label;
-  final String value;
-  final TextAlign align;
-
-  const _Metric({
-    required this.label,
-    required this.value,
-    this.align = TextAlign.start,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          textAlign: align,
-          style: const TextStyle(
-            color: Color(0xFF6D746F),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          textAlign: align,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-  }
-}
-
-final class _Controls extends StatelessWidget {
-  final TimerPhase phase;
-  final bool canResume;
-  final bool canPass;
-  final VoidCallback onBreakOrResume;
-  final VoidCallback onPassTurn;
-  final VoidCallback onAddMinute;
-  final VoidCallback onFinish;
-  final VoidCallback onRestart;
-
-  const _Controls({
-    required this.phase,
-    required this.canResume,
-    required this.canPass,
-    required this.onBreakOrResume,
-    required this.onPassTurn,
-    required this.onAddMinute,
-    required this.onFinish,
-    required this.onRestart,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final canBreak =
-        phase == TimerPhase.runningNormal ||
-        phase == TimerPhase.runningOvertime ||
-        (phase == TimerPhase.paused && canResume);
-    final isPaused = phase == TimerPhase.paused;
-    final isAutoPaused = isPaused && !canResume;
-    final isFinished = phase == TimerPhase.finished;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: CupertinoButton.filled(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                onPressed: canPass ? onPassTurn : null,
-                child: const _ControlLabel('차례 넘기기'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: CupertinoButton(
-                color: const Color(0xFF1C2523),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                onPressed: canBreak ? onBreakOrResume : null,
-                child: _ControlLabel(
-                  isPaused ? (canResume ? '이어서 하기' : '차례 끝') : '잠깐 쉬기',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: CupertinoButton(
-                color: const Color(0xFF775A2C),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                onPressed: isFinished ? null : onFinish,
-                child: const _ControlLabel('오늘은 여기까지'),
-              ),
-            ),
-          ],
-        ),
-        if (isAutoPaused) ...[
-          const SizedBox(height: 8),
-          const _NoticeLine('차례를 넘기면 이어집니다.'),
-        ],
-        if (phase == TimerPhase.needsExtension) ...[
-          const SizedBox(height: 8),
-          CupertinoButton(
-            color: const Color(0xFF2D6A64),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            onPressed: onAddMinute,
-            child: const _ControlLabel('1분 더하기'),
-          ),
-        ],
-        if (isFinished) ...[
-          const SizedBox(height: 8),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            onPressed: onRestart,
-            child: const Text('새 대화 시작'),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-final class _ControlLabel extends StatelessWidget {
-  final String text;
-
-  const _ControlLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        text,
-        maxLines: 1,
-        style: const TextStyle(
-          color: CupertinoColors.white,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
 }
 
 final class _FeedbackBanner extends StatelessWidget {
@@ -849,35 +731,4 @@ final class _FeedbackBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-final class _NoticeLine extends StatelessWidget {
-  final String text;
-
-  const _NoticeLine(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFF5F6964),
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-String _headline(
-  TimerPhase phase,
-  String activeName, {
-  required bool canResume,
-}) {
-  return switch (phase) {
-    TimerPhase.paused => canResume ? '잠깐 쉬는 중' : '차례가 끝났어요',
-    TimerPhase.needsExtension => '$activeName님의 전체 시간이 끝났어요',
-    TimerPhase.finished => '대화가 끝났어요',
-    _ => '$activeName님 차례',
-  };
 }

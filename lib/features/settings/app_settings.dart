@@ -43,6 +43,10 @@ abstract interface class AppSettingsStorage {
 }
 
 abstract interface class AppSettingsStore {
+  Future<AppSettingsDraft> loadSettings();
+
+  Future<void> saveSettings(AppSettingsDraft settings);
+
   Future<SessionConfig?> loadSessionConfig();
 
   Future<void> saveSessionConfig(SessionConfig config);
@@ -62,7 +66,60 @@ final class JsonAppSettingsStore implements AppSettingsStore {
   }
 
   @override
+  Future<AppSettingsDraft> loadSettings() async {
+    final decoded = await _readSettingsJson();
+    if (decoded == null) {
+      return AppSettingsDraft.defaults();
+    }
+
+    final config = _sessionConfigFromDecoded(decoded);
+    if (config == null) {
+      return AppSettingsDraft.defaults();
+    }
+
+    return AppSettingsDraft(
+      sessionDefaults: SessionSettingsDraft.fromSessionConfig(config),
+      autoSaveRecords: decoded['autoSaveRecords'] as bool? ?? false,
+    );
+  }
+
+  @override
+  Future<void> saveSettings(AppSettingsDraft settings) async {
+    final encoded = const JsonEncoder.withIndent('  ').convert({
+      'version': 1,
+      'autoSaveRecords': settings.autoSaveRecords,
+      'sessionConfig': _sessionConfigToJson(
+        settings.sessionDefaults.toSessionConfig(),
+      ),
+    });
+    await storage.write(encoded);
+  }
+
+  @override
   Future<SessionConfig?> loadSessionConfig() async {
+    final decoded = await _readSettingsJson();
+    if (decoded == null) {
+      return null;
+    }
+    return _sessionConfigFromDecoded(decoded);
+  }
+
+  @override
+  Future<void> saveSessionConfig(SessionConfig config) async {
+    final currentSettings = await loadSettings();
+    await saveSettings(
+      currentSettings.copyWith(
+        sessionDefaults: SessionSettingsDraft.fromSessionConfig(config),
+      ),
+    );
+  }
+
+  @override
+  Future<void> clear() async {
+    await storage.clear();
+  }
+
+  Future<Map<String, Object?>?> _readSettingsJson() async {
     try {
       final contents = await storage.read();
       if (contents == null || contents.trim().isEmpty) {
@@ -73,7 +130,14 @@ final class JsonAppSettingsStore implements AppSettingsStore {
       if (decoded['version'] != 1) {
         return null;
       }
+      return decoded;
+    } catch (_) {
+      return null;
+    }
+  }
 
+  SessionConfig? _sessionConfigFromDecoded(Map<String, Object?> decoded) {
+    try {
       final sessionConfig = decoded['sessionConfig'];
       if (sessionConfig is! Map<String, Object?>) {
         return null;
@@ -86,19 +150,6 @@ final class JsonAppSettingsStore implements AppSettingsStore {
     } catch (_) {
       return null;
     }
-  }
-
-  @override
-  Future<void> saveSessionConfig(SessionConfig config) async {
-    final encoded = const JsonEncoder.withIndent(
-      '  ',
-    ).convert({'version': 1, 'sessionConfig': _sessionConfigToJson(config)});
-    await storage.write(encoded);
-  }
-
-  @override
-  Future<void> clear() async {
-    await storage.clear();
   }
 }
 

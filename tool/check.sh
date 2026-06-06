@@ -16,4 +16,5 @@ flutter test test/app/app_settings_defaults_flow_test.dart
 flutter test test/app/session_settings_flow_test.dart
 flutter test test/app/timer_screen_test.dart
 flutter test test/app/wrap_up_history_test.dart
+flutter test test/release_identity_test.dart
 flutter build web --no-pub

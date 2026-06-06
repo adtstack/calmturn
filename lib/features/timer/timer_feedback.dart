@@ -91,10 +91,7 @@ final class TimerFeedbackService {
         showOvertime
             ? '오버타임이 시작됐어요. 준비되면 차례를 넘겨주세요.'
             : '차례 시간이 끝났어요. 준비되면 차례를 넘겨주세요.',
-      PenaltyReachedEvent(:final penaltyCount) when alert.penaltyAlertEnabled =>
-        showOvertime
-            ? '오버타임 기준에 도달했어요. 주의 표시 $penaltyCount회 기록'
-            : '주의 표시 $penaltyCount회 기록',
+      PenaltyReachedEvent() when alert.penaltyAlertEnabled => null,
       _ => null,
     };
 

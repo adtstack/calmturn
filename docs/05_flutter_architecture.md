@@ -1,287 +1,59 @@
-# 05. Flutter Architecture
+# 05. Flutter Architecture - v4
 
-## 1. 기술 선택
-Flutter는 Android와 iOS를 하나의 코드베이스로 만들 수 있다. 우선순위는 Android/Flutter MVP이며, UI는 Android에서 자연스러운 Material 기반을 기본으로 둔다.
+## 기술 선택
+- Flutter + Cupertino UI
+- 순수 Dart 타이머 엔진
+- 로컬 JSON 저장소
+- 외부 서버 없음
 
-## 2. 권장 구조
+## 구조
 ```text
 lib/
   main.dart
-  app.dart
-  core/
-    theme/
-    utils/
-    constants/
-    time/
   features/
-    session_setup/
-      presentation/
-      application/
-      domain/
-    timer/
-      presentation/
-      application/
-      domain/
-    feedback/
-      application/
-      domain/
-      data/
-    history/
-      presentation/
-      application/
-      domain/
-      data/
     settings/
-      presentation/
-      application/
+    timer/
       domain/
-      data/
-  shared/
-    widgets/
-    models/
+    history/
 ```
 
-## 3. 상태관리
-권장: Riverpod
+## 앱 계층
+- `CalmTurnApp`: 테마와 루트 주입
+- `_CalmTurnRoot`: 설정 로드, 시작 화면, 고급설정, 기록 화면 라우팅
+- `SessionSetupPage`: v4 시작 화면
+- `SettingsScreen`: 고급설정
+- `TimerHomePage`: 실행 화면과 마무리 진입
+- `WrapUpPage`: 종료 후 기록 입력
+- `HistoryScreen`, `HistoryDayScreen`, `HistoryDetailScreen`: 기록 보기
 
-이유:
-- 타이머 상태를 UI와 분리하기 쉽다.
-- 단위 테스트가 쉽다.
-- 세션 설정, 타이머, 설정값, 기록 저장을 각각 관리하기 좋다.
+## 도메인 계층
+- `TimerEngine`: 시간 흐름, 차례 넘김, 일시정지, 종료 이벤트를 담당한다.
+- `SessionConfig`: 참가자, 총 발언시간, 턴 제한, 오버타임, 알림 설정 스냅샷이다.
+- `TimerSnapshot`: 현재 상태를 UI에 전달한다.
+- `TimerEvent`: 알림과 기록에 필요한 상태 변화를 표현한다.
 
-대안:
-- Bloc
-- Provider
-- ValueNotifier 기반 단순 구조
+## 저장소
+- 설정은 `AppSettingsStore`를 통해 저장한다.
+- 기록은 `SessionRecordStore`를 통해 저장한다.
+- 웹/IO/테스트 저장소를 분리한다.
+- 기록은 로컬에만 저장한다.
 
-MVP에서는 Riverpod 또는 ValueNotifier 중 하나로 시작해도 된다. 핵심은 **타이머 엔진을 UI에서 분리하는 것**이다.
+## UI 원칙
+- 시작 화면에는 핵심 설정만 둔다.
+- 고급설정은 별도 화면에 둔다.
+- 실행 화면은 장식보다 터치 영역과 시간 가독성을 우선한다.
+- 패널티/주의 문구는 실행 화면과 기본 기록 화면에 표시하지 않는다.
+- 기록 상세에서는 참가자별 사용 시간을 확인할 수 있다.
 
-## 4. 핵심 도메인 객체
-```text
-Participant
-SessionConfig
-OvertimeConfig
-PenaltyConfig
-AlertConfig
-TimerSession
-TimerSnapshot
-TimerEvent
-PenaltyEvent
-AlertEvent
-SessionRecord
-```
+## 테스트 전략
+- 타이머 엔진은 순수 Dart 테스트로 검증한다.
+- 설정 검증은 단위 테스트로 막는다.
+- 시작/실행/마무리/기록 흐름은 Flutter 위젯 테스트로 검증한다.
+- 릴리스 정체성은 `test/release_identity_test.dart`로 검증한다.
+- 출시 전 기본 검증은 README의 명령 세트를 따른다.
 
-## 5. 도메인 모델 개요
-### Participant
-- id
-- name
-- totalAllocatedSeconds
-- totalRemainingSeconds
-- totalUsedSeconds
-- turnCount
-- overtimeTotalSeconds
-- penaltyCount
-
-### SessionConfig
-- participantA
-- participantB
-- turnLimitSeconds
-- firstSpeakerId
-- overtimeConfig
-- penaltyConfig
-- alertConfig
-- requireConsentForExtension
-
-### OvertimeConfig
-- enabled
-- showOvertime
-- countUp
-- behavior
-  - overtime
-  - autoPause, when overtime is disabled
-  - autoSwitch, future
-
-### PenaltyConfig
-- enabled
-- thresholdSeconds
-- repeatMode
-  - oncePerTurn
-  - everyThreshold
-- labelMode
-  - overtimeMark
-  - warningMark
-  - penalty
-
-### AlertConfig
-- warningBeforeSeconds
-- turnWarningEnabled
-- totalWarningEnabled
-- overtimeStartAlertEnabled
-- penaltyAlertEnabled
-- visualEnabled
-- soundEnabled
-- hapticEnabled
-- soundType
-- hapticStrength
-
-## 6. 타이머 엔진 구조
-타이머 엔진은 순수 Dart 클래스로 만든다. UI 위젯, 플랫폼 소리, 진동, 저장소에 직접 의존하지 않는다.
-
-```text
-TimerEngine
-  - start(config)
-  - tick(elapsedSeconds)
-  - passTurn()
-  - pause()
-  - resume()
-  - finish()
-  - addTime(participantId, seconds)
-  - snapshot()
-```
-
-엔진은 상태 변경 결과로 이벤트를 반환한다.
-
-```text
-TimerEvent
-  - TurnWarning
-  - TotalWarning
-  - OvertimeStarted
-  - PenaltyReached
-  - TurnPassed
-  - TotalTimeEnded
-  - SessionPaused
-  - SessionFinished
-```
-
-UI는 이벤트를 받아 화면 표시를 갱신하고, FeedbackService는 알림 설정에 따라 소리/진동/햅틱을 실행한다.
-
-## 7. 상태 머신
-```text
-Draft
-  -> WaitingConsent
-  -> Running.Normal
-  -> Running.Overtime
-  -> Paused
-  -> Running.Normal / Running.Overtime
-  -> NeedsExtension
-  -> Finished
-```
-
-### Running.Normal
-- 턴 시간이 남아 있다.
-- 현재 발언자의 전체 시간과 턴 시간이 줄어든다.
-- 사전 알림 조건을 검사한다.
-
-### Running.Overtime
-- 턴 시간이 0이다.
-- 오버타임이 증가한다.
-- 현재 발언자의 전체 시간이 남아 있으면 전체 시간도 계속 줄어든다.
-- 패널티 기준 도달 여부를 검사한다.
-
-### NeedsExtension
-- 현재 발언자의 전체 시간이 0이다.
-- 추가 시간 또는 종료를 선택해야 한다.
-
-## 8. FeedbackService
-소리, 진동, 햅틱, 화면 알림은 타이머 엔진이 직접 처리하지 않는다.
-
-```text
-FeedbackService
-  - handle(AlertEvent event, AlertConfig config)
-  - playSound(soundType)
-  - triggerHaptic(strength)
-  - showVisualCue(event)
-```
-
-장점:
-- iOS와 Android 플랫폼 차이를 분리할 수 있다.
-- 테스트에서 소리/진동을 목 처리할 수 있다.
-- 사용자가 알림을 끄면 서비스에서 막을 수 있다.
-
-## 9. 로컬 저장 구조
-MVP는 로컬 저장만 한다.
-
-권장 저장 대상:
-- 앱 설정값
-- 최근 세션 기록
-- 사용자 입력 메모
-
-저장소 후보:
-- SharedPreferences 계열: 간단한 설정값
-- 로컬 DB 계열: 세션 기록이 늘어날 때
-
-초기 MVP에서는 설정값과 기록 수가 적으므로 단순 저장으로 시작해도 된다. 단, 데이터 모델은 나중에 로컬 DB로 옮기기 쉽게 분리한다.
-
-## 10. 화면 계층 구조
-```text
-App
-  HomeScreen
-  SessionSetupFlow
-    ParticipantStep
-    TimeConfigStep
-    OvertimeConfigStep
-    AlertConfigStep
-    ConsentScreen
-  TimerScreen
-    ParticipantCard
-    TurnClock
-    OvertimeBanner
-    PenaltyBadge
-    TimerControls
-  BreakScreen
-  ExtensionScreen
-  WrapUpScreen
-  HistoryScreen
-  SettingsScreen
-```
-
-## 11. 테스트 전략
-### 단위 테스트
-반드시 작성:
-- 참가자별 전체 시간이 다르게 설정되는지
-- 턴 시간이 감소하는지
-- 턴 시간이 0이 되면 오버타임이 시작되는지
-- 오버타임이 증가하는지
-- 오버타임 60초에 패널티가 발생하는지
-- 반복 패널티가 꺼져 있으면 한 턴에 한 번만 발생하는지
-- 반복 패널티가 켜져 있으면 기준마다 발생하는지
-- 10초 전 알림 이벤트가 발생하는지
-- 알림 이벤트가 중복 발생하지 않는지
-- 전체 시간이 0이 되면 NeedsExtension으로 이동하는지
-- 휴식 중에는 시간이 흐르지 않는지
-
-### 위젯 테스트
-- 설정 화면에서 각자 다른 시간 입력
-- Consent 화면 규칙 표시
-- Timer 화면 Normal/Overtime/Penalty 상태 표시
-- Alert 설정 토글
-- Wrap-up 요약 표시
-
-### 수동 테스트
-- 실제 Android 기기에서 진동/햅틱 확인
-- 소리 설정 확인
-- 화면이 잠깐 꺼졌다 돌아온 후 타이머 확인
-- 긴 세션에서 시간 오차 확인
-
-## 12. 백그라운드/시간 정확도
-타이머는 단순히 1초마다 숫자를 빼는 방식만 사용하면 앱이 백그라운드에 있을 때 오차가 생길 수 있다.
-
-권장 방식:
-- 세션 시작 시각과 마지막 업데이트 시각을 저장한다.
-- UI 업데이트는 1초마다 한다.
-- 실제 계산은 현재 시각과 마지막 계산 시각의 차이로 한다.
-- 앱이 다시 활성화되면 경과 시간을 엔진에 전달한다.
-
-## 13. 알림 구현 주의
-MVP의 10초 전 알림은 앱 내부 피드백이다. 푸시 알림이 아니다.
-
-- 앱이 열려 있을 때 화면/소리/진동으로 알린다.
-- 앱 밖에서 알림을 보내는 기능은 MVP에서 제외한다.
-- 소리와 햅틱은 사용자 설정을 따른다.
-- 기기나 OS 설정 때문에 소리/진동이 실행되지 않을 수 있으므로 화면 표시를 항상 기본 피드백으로 둔다.
-
-## 14. 의존성 원칙
-- 타이머 엔진은 외부 패키지 없이 순수 Dart로 작성한다.
-- 플랫폼 피드백은 어댑터로 분리한다.
-- 저장소는 인터페이스를 먼저 만들고 구현체를 나중에 바꿀 수 있게 한다.
-- UI는 엔진 상태를 읽기만 하고, 시간 계산을 직접 하지 않는다.
+## 유지보수 원칙
+- UI 문구는 README와 `docs/10_copy_and_brand.md`를 기준으로 맞춘다.
+- 시간 규칙은 `docs/11_time_rules.md`를 기준으로 맞춘다.
+- 설정/알림 기본값은 `docs/12_settings_and_notifications.md`를 기준으로 맞춘다.
+- 죽은 화면이나 테스트가 없는 보조 위젯은 남기지 않는다.
