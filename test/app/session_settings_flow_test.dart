@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('v4 setup starts with spouse defaults and simple time controls', (
+  testWidgets('setup uses fair shared time controls and entry buttons', (
     tester,
   ) async {
     final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
@@ -16,11 +16,17 @@ void main() {
     expect(find.text('시계'), findsOneWidget);
     expect(_textFieldValue(tester, 0), '남편');
     expect(_textFieldValue(tester, 1), '와이프');
-    expect(find.text('각자 10분'), findsOneWidget);
-    expect(find.text('각자 20분'), findsOneWidget);
-    expect(find.text('각자 30분'), findsOneWidget);
-    expect(find.text('각자 60분'), findsOneWidget);
-    expect(find.text('턴 3분'), findsOneWidget);
+    expect(find.text('10분'), findsOneWidget);
+    expect(find.text('20분'), findsOneWidget);
+    expect(find.text('30분'), findsOneWidget);
+    expect(find.text('60분'), findsOneWidget);
+    expect(find.text('1분'), findsOneWidget);
+    expect(find.text('2분'), findsOneWidget);
+    expect(find.text('3분'), findsOneWidget);
+    expect(find.text('5분'), findsOneWidget);
+    expect(find.text('각자 다르게'), findsNothing);
+    expect(find.text('A 10분'), findsNothing);
+    expect(find.byKey(const ValueKey('history-button')), findsOneWidget);
     expect(find.text('오버타임'), findsNothing);
     expect(
       find.byKey(const ValueKey('advanced-settings-button')),
@@ -39,8 +45,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await _tapText(tester, '각자 20분');
-    await _tapText(tester, '턴 5분');
+    await _tapText(tester, '20분');
+    await _tapText(tester, '5분');
     await _tapText(tester, '시작');
 
     expect(find.text('두 사람이 같은 규칙을 보고 시작해요'), findsNothing);
@@ -95,7 +101,8 @@ void main() {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
-  await _tapText(tester, '종료');
+  await tester.tap(find.byKey(const ValueKey('finish-session-button')));
+  await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
 }

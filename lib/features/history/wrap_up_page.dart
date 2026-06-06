@@ -61,10 +61,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _isBusy = false;
-      _statusMessage = '이 기기에 기록을 저장했어요.';
-    });
+    widget.onStartAnotherSession();
   }
 
   Future<void> _finishWithoutSaving() async {
@@ -78,10 +75,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _isBusy = false;
-      _statusMessage = '기록하지 않고 마쳤어요.';
-    });
+    widget.onStartAnotherSession();
   }
 
   void _openHistory() {
@@ -146,7 +140,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             ),
             CupertinoButton(
               onPressed: widget.onStartAnotherSession,
-              child: const Text('새 대화'),
+              child: const Text('설정으로 돌아가기'),
             ),
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),

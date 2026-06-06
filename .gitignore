@@ -10,6 +10,7 @@
 .pub/
 /build/
 /coverage/
+.superpowers/
 **/doc/api/
 app.*.symbols
 app.*.map.json

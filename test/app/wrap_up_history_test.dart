@@ -1,6 +1,7 @@
 import 'package:calmturn/features/history/session_record.dart';
 import 'package:calmturn/features/history/session_record_store.dart';
 import 'package:calmturn/features/history/history_screen.dart';
+import 'package:calmturn/features/settings/app_settings.dart';
 import 'package:calmturn/features/timer/domain/timer_engine.dart';
 import 'package:calmturn/features/timer/domain/timer_models.dart';
 import 'package:calmturn/main.dart';
@@ -11,15 +12,21 @@ void main() {
   testWidgets('wrap-up saves outcome fields and history drills down by date', (
     tester,
   ) async {
+    final settingsStore = JsonAppSettingsStore(
+      storage: InMemoryAppSettingsStorage(),
+    );
     final recordStore = JsonSessionRecordStore(
       storage: InMemorySessionRecordStorage(),
     );
-    await _pumpTimer(tester, _config(), recordStore);
+
+    await _pumpApp(tester, settingsStore, recordStore);
+    await _tapText(tester, '시작');
 
     await tester.pump(const Duration(seconds: 42));
     await _finishThroughDialog(tester);
 
     expect(find.text('대화가 끝났어요'), findsOneWidget);
+    await _ensureTextVisible(tester, '잘 마무리됨');
     expect(find.text('잘 마무리됨'), findsOneWidget);
     expect(find.text('아직 남음'), findsOneWidget);
     expect(find.textContaining('주의 표시'), findsNothing);
@@ -39,12 +46,19 @@ void main() {
     expect(records.single.summaryText, '서로 말이 겹치는 구간을 줄였다.');
     expect(records.single.tagsText, '#말끊김 #예산');
     expect(records.single.outcome, ConversationOutcome.unresolved);
+    expect(find.text('시계'), findsOneWidget);
+    expect(find.byKey(const ValueKey('clock-left-zone')), findsNothing);
 
-    await _tapText(tester, '기록 보기');
+    await tester.tap(find.byKey(const ValueKey('history-button')));
+    await tester.pumpAndSettle();
     expect(find.text('기록 달력'), findsWidgets);
-    expect(find.text('X'), findsOneWidget);
+    expect(find.byKey(const ValueKey('history-calendar-grid')), findsOneWidget);
+    expect(find.text('일'), findsOneWidget);
+    expect(find.text('토'), findsOneWidget);
+    expect(find.text('❌'), findsOneWidget);
 
-    await _tapText(tester, _todayLabel());
+    await tester.tap(find.byKey(ValueKey('history-day-${_todayIsoDate()}')));
+    await tester.pumpAndSettle();
     expect(find.text('오늘의 기록'), findsWidgets);
     expect(find.text('서로 말이 겹치는 구간을 줄였다.'), findsOneWidget);
 
@@ -91,8 +105,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('X O X'), findsOneWidget);
-    expect(find.text('O X O'), findsNothing);
+    expect(find.byKey(const ValueKey('history-calendar-grid')), findsOneWidget);
+    expect(find.text('일'), findsOneWidget);
+    expect(find.text('월'), findsOneWidget);
+    expect(find.text('토'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('history-day-2026-06-06')),
+      findsOneWidget,
+    );
+    expect(find.text('❌✅❌'), findsOneWidget);
+    expect(find.text('✅❌✅'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -100,10 +122,17 @@ void main() {
   testWidgets('finish without saving removes an auto-saved draft record', (
     tester,
   ) async {
+    final settingsStore = JsonAppSettingsStore(
+      storage: InMemoryAppSettingsStorage(),
+    );
+    await settingsStore.saveSettings(
+      AppSettingsDraft.defaults().copyWith(autoSaveRecords: true),
+    );
     final recordStore = JsonSessionRecordStore(
       storage: InMemorySessionRecordStorage(),
     );
-    await _pumpTimer(tester, _config(), recordStore, autoSaveRecords: true);
+    await _pumpApp(tester, settingsStore, recordStore);
+    await _tapText(tester, '시작');
 
     await tester.pump(const Duration(seconds: 12));
     await _finishThroughDialog(tester);
@@ -113,32 +142,42 @@ void main() {
     await _tapText(tester, '저장하지 않고 마치기');
 
     expect(await recordStore.load(), isEmpty);
-    expect(find.text('기록하지 않고 마쳤어요.'), findsOneWidget);
+    expect(find.text('시계'), findsOneWidget);
+    expect(find.text('기록하지 않고 마쳤어요.'), findsNothing);
+    expect(find.byKey(const ValueKey('clock-left-zone')), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
 
-Future<void> _pumpTimer(
+Future<void> _pumpApp(
   WidgetTester tester,
-  SessionConfig config,
-  SessionRecordStore recordStore, {
-  bool autoSaveRecords = false,
-}) async {
+  AppSettingsStore settingsStore,
+  SessionRecordStore recordStore,
+) async {
   await tester.pumpWidget(
-    CupertinoApp(
-      home: TimerHomePage(
-        config: config,
-        recordStore: recordStore,
-        autoSaveRecords: autoSaveRecords,
-      ),
-    ),
+    CalmTurnApp(settingsStore: settingsStore, recordStore: recordStore),
   );
+  await tester.pump();
   await tester.pump();
 }
 
+Future<void> _ensureTextVisible(WidgetTester tester, String text) async {
+  final textFinder = find.text(text);
+  if (textFinder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      textFinder,
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+  }
+  await tester.ensureVisible(textFinder.last);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _finishThroughDialog(WidgetTester tester) async {
-  await _tapText(tester, '종료');
+  await tester.tap(find.byKey(const ValueKey('finish-session-button')));
+  await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
 }
@@ -159,9 +198,13 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
-String _todayLabel() {
+String _todayIsoDate() {
   final now = DateTime.now();
-  return '${now.month}/${now.day}';
+  return '${now.year}-${_two(now.month)}-${_two(now.day)}';
+}
+
+String _two(int value) {
+  return value.toString().padLeft(2, '0');
 }
 
 SessionConfig _config() {

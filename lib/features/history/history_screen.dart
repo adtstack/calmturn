@@ -75,18 +75,10 @@ final class _HistoryScreenState extends State<HistoryScreen> {
             else if (grouped.isEmpty)
               const _StatusLine('저장된 기록이 아직 없어요.')
             else
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: grouped.entries
-                    .map((entry) {
-                      return _CalendarDayCard(
-                        day: entry.key,
-                        records: entry.value,
-                        onTap: () => _openDay(entry.key, entry.value),
-                      );
-                    })
-                    .toList(growable: false),
+              _HistoryCalendar(
+                month: _monthStart(grouped.keys.first),
+                groupedRecords: grouped,
+                onOpenDay: _openDay,
               ),
           ],
         ),
@@ -261,12 +253,86 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   }
 }
 
-final class _CalendarDayCard extends StatelessWidget {
+final class _HistoryCalendar extends StatelessWidget {
+  final DateTime month;
+  final Map<DateTime, List<SessionRecord>> groupedRecords;
+  final Future<void> Function(DateTime day, List<SessionRecord> records)
+  onOpenDay;
+
+  const _HistoryCalendar({
+    required this.month,
+    required this.groupedRecords,
+    required this.onOpenDay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final weeks = _calendarWeeks(month);
+    return _Card(
+      child: Column(
+        key: const ValueKey('history-calendar-grid'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${month.year}년 ${month.month}월',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: const ['일', '월', '화', '수', '목', '금', '토'].map((label) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: Color(0xFF5F6964),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+          ...weeks.map((week) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: week
+                    .map((day) {
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: day == null
+                              ? const SizedBox(height: 64)
+                              : _CalendarDayCell(
+                                  day: day,
+                                  records: groupedRecords[day] ?? const [],
+                                  onTap: groupedRecords.containsKey(day)
+                                      ? () =>
+                                            onOpenDay(day, groupedRecords[day]!)
+                                      : null,
+                                ),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+final class _CalendarDayCell extends StatelessWidget {
   final DateTime day;
   final List<SessionRecord> records;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _CalendarDayCard({
+  const _CalendarDayCell({
     required this.day,
     required this.records,
     required this.onTap,
@@ -278,33 +344,50 @@ final class _CalendarDayCard extends StatelessWidget {
       ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
     final markText = marks
         .take(3)
-        .map((record) => record.outcome?.mark ?? '-')
-        .join(' ');
-    return SizedBox(
-      width: 104,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: _Card(
+        .map((record) => _calendarOutcomeMark(record.outcome))
+        .join();
+    final hasRecords = records.isNotEmpty;
+    final child = DecoratedBox(
+      decoration: BoxDecoration(
+        color: hasRecords ? const Color(0xFFE7F1EC) : const Color(0xFFF8F7F2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasRecords ? const Color(0xFF2D6A64) : const Color(0xFFE0DCD2),
+          width: hasRecords ? 1.5 : 1,
+        ),
+      ),
+      child: SizedBox(
+        height: 64,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _dayLabel(day),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
+                day.day.toString(),
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 8),
               Text(
                 markText,
                 maxLines: 1,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+
+    return GestureDetector(
+      key: ValueKey('history-day-${_isoDate(day)}'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: child,
     );
   }
 }
@@ -527,6 +610,45 @@ bool _isToday(DateTime day) {
 
 String _dayLabel(DateTime value) {
   return '${value.month}/${value.day}';
+}
+
+DateTime _monthStart(DateTime value) {
+  return DateTime(value.year, value.month);
+}
+
+List<List<DateTime?>> _calendarWeeks(DateTime month) {
+  final firstDay = _monthStart(month);
+  final leadingEmptyDays = firstDay.weekday % DateTime.daysPerWeek;
+  final days = <DateTime?>[
+    ...List<DateTime?>.filled(leadingEmptyDays, null),
+    for (var day = 1; day <= _daysInMonth(month); day += 1)
+      DateTime(month.year, month.month, day),
+  ];
+  while (days.length % DateTime.daysPerWeek != 0) {
+    days.add(null);
+  }
+
+  final weeks = <List<DateTime?>>[];
+  for (var index = 0; index < days.length; index += DateTime.daysPerWeek) {
+    weeks.add(days.sublist(index, index + DateTime.daysPerWeek));
+  }
+  return weeks;
+}
+
+int _daysInMonth(DateTime month) {
+  return DateTime(month.year, month.month + 1, 0).day;
+}
+
+String _isoDate(DateTime value) {
+  return '${value.year}-${_two(value.month)}-${_two(value.day)}';
+}
+
+String _calendarOutcomeMark(ConversationOutcome? outcome) {
+  return switch (outcome) {
+    ConversationOutcome.resolved => '✅',
+    ConversationOutcome.unresolved => '❌',
+    null => '-',
+  };
 }
 
 String _timeLabel(DateTime value) {

@@ -5,10 +5,10 @@ import '../timer/domain/timer_models.dart';
 import 'session_settings.dart';
 
 const sharedTotalMinuteOptions = [
-  ChoiceOption('각자 10분', 600),
-  ChoiceOption('각자 20분', 1200),
-  ChoiceOption('각자 30분', 1800),
-  ChoiceOption('각자 60분', 3600),
+  ChoiceOption('10분', 600),
+  ChoiceOption('20분', 1200),
+  ChoiceOption('30분', 1800),
+  ChoiceOption('60분', 3600),
 ];
 
 const participantATotalMinuteOptions = [
@@ -26,10 +26,10 @@ const participantBTotalMinuteOptions = [
 ];
 
 const turnLimitMinuteOptions = [
-  ChoiceOption('턴 1분', 60),
-  ChoiceOption('턴 3분', 180),
-  ChoiceOption('턴 5분', 300),
-  ChoiceOption('턴 10분', 600),
+  ChoiceOption('1분', 60),
+  ChoiceOption('2분', 120),
+  ChoiceOption('3분', 180),
+  ChoiceOption('5분', 300),
 ];
 
 final class SessionSetupPage extends StatefulWidget {
@@ -60,7 +60,7 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
   @override
   void initState() {
     super.initState();
-    _draft = widget.initialDraft;
+    _draft = _normalizeSetupDraft(widget.initialDraft);
     _participantAController.text = _draft.participantAName;
     _participantBController.text = _draft.participantBName;
   }
@@ -77,30 +77,15 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('시계'),
-        trailing: widget.onOpenAppSettings == null
-            ? null
-            : CupertinoButton(
-                key: const ValueKey('advanced-settings-button'),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onOpenAppSettings,
-                child: const Icon(CupertinoIcons.gear_alt),
-              ),
+        trailing: _SetupActions(
+          onOpenHistory: widget.onOpenHistory,
+          onOpenAppSettings: widget.onOpenAppSettings,
+        ),
       ),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
           children: [
-            if (widget.onOpenHistory != null) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: widget.onOpenHistory,
-                  child: const Text('저장된 기록 보기'),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
             _Section(
               title: '참가자',
               children: [
@@ -128,50 +113,23 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
             _Section(
               title: '전체 시간',
               children: [
-                if (_draft.totalTimeMode == TotalTimeMode.same)
-                  MinutePresetField(
-                    value: _draft.sharedTotalSeconds,
-                    options: sharedTotalMinuteOptions,
-                    inputKey: 'shared-total-minutes-field',
-                    minMinutes: minTotalMinutes,
-                    maxMinutes: maxTotalMinutes,
-                    rangeMessage: invalidTotalTimeRangeMessage,
-                    onInvalidInput: _handleInvalidInput,
-                    onChanged: (value) {
-                      _updateDraft(_draft.copyWith(sharedTotalSeconds: value));
-                    },
-                  )
-                else ...[
-                  MinutePresetField(
-                    value: _draft.participantATotalSeconds,
-                    options: participantATotalMinuteOptions,
-                    inputKey: 'participant-a-total-minutes-field',
-                    minMinutes: minTotalMinutes,
-                    maxMinutes: maxTotalMinutes,
-                    rangeMessage: invalidTotalTimeRangeMessage,
-                    onInvalidInput: _handleInvalidInput,
-                    onChanged: (value) {
-                      _updateDraft(
-                        _draft.copyWith(participantATotalSeconds: value),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  MinutePresetField(
-                    value: _draft.participantBTotalSeconds,
-                    options: participantBTotalMinuteOptions,
-                    inputKey: 'participant-b-total-minutes-field',
-                    minMinutes: minTotalMinutes,
-                    maxMinutes: maxTotalMinutes,
-                    rangeMessage: invalidTotalTimeRangeMessage,
-                    onInvalidInput: _handleInvalidInput,
-                    onChanged: (value) {
-                      _updateDraft(
-                        _draft.copyWith(participantBTotalSeconds: value),
-                      );
-                    },
-                  ),
-                ],
+                MinutePresetField(
+                  value: _draft.sharedTotalSeconds,
+                  options: sharedTotalMinuteOptions,
+                  inputKey: 'shared-total-minutes-field',
+                  minMinutes: minTotalMinutes,
+                  maxMinutes: maxTotalMinutes,
+                  rangeMessage: invalidTotalTimeRangeMessage,
+                  onInvalidInput: _handleInvalidInput,
+                  onChanged: (value) {
+                    _updateDraft(
+                      _draft.copyWith(
+                        totalTimeMode: TotalTimeMode.same,
+                        sharedTotalSeconds: value,
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
             _Section(
@@ -252,6 +210,49 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
 
     widget.onSessionAccepted(_draft.toSessionConfig());
   }
+}
+
+final class _SetupActions extends StatelessWidget {
+  final VoidCallback? onOpenHistory;
+  final VoidCallback? onOpenAppSettings;
+
+  const _SetupActions({this.onOpenHistory, this.onOpenAppSettings});
+
+  @override
+  Widget build(BuildContext context) {
+    if (onOpenHistory == null && onOpenAppSettings == null) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onOpenHistory != null)
+          CupertinoButton(
+            key: const ValueKey('history-button'),
+            padding: EdgeInsets.zero,
+            onPressed: onOpenHistory,
+            child: const Icon(CupertinoIcons.calendar),
+          ),
+        if (onOpenAppSettings != null)
+          CupertinoButton(
+            key: const ValueKey('advanced-settings-button'),
+            padding: EdgeInsets.zero,
+            onPressed: onOpenAppSettings,
+            child: const Icon(CupertinoIcons.gear_alt),
+          ),
+      ],
+    );
+  }
+}
+
+SessionSettingsDraft _normalizeSetupDraft(SessionSettingsDraft draft) {
+  final sharedTotalSeconds = draft.totalTimeMode == TotalTimeMode.same
+      ? draft.sharedTotalSeconds
+      : draft.participantATotalSeconds;
+  return draft.copyWith(
+    totalTimeMode: TotalTimeMode.same,
+    sharedTotalSeconds: sharedTotalSeconds,
+  );
 }
 
 final class ChoiceOption<T> {

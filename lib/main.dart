@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
@@ -16,6 +15,7 @@ import 'features/settings/session_settings.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/timer/domain/timer_engine.dart';
 import 'features/timer/domain/timer_models.dart';
+import 'features/timer/timer_display_controller.dart';
 import 'features/timer/timer_feedback.dart';
 
 void main() {
@@ -170,6 +170,11 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
       config: config,
       recordStore: _recordStore,
       autoSaveRecords: _appSettings.autoSaveRecords,
+      onReturnToSetup: () {
+        setState(() {
+          _sessionConfig = null;
+        });
+      },
     );
   }
 }
@@ -177,15 +182,19 @@ final class _CalmTurnRootState extends State<_CalmTurnRoot> {
 final class TimerHomePage extends StatefulWidget {
   final SessionConfig config;
   final TimerFeedbackService feedbackService;
+  final TimerDisplayController timerDisplayController;
   final SessionRecordStore? recordStore;
   final bool autoSaveRecords;
+  final VoidCallback? onReturnToSetup;
 
   const TimerHomePage({
     super.key,
     required this.config,
     this.feedbackService = const TimerFeedbackService(),
+    this.timerDisplayController = const PlatformTimerDisplayController(),
     this.recordStore,
     this.autoSaveRecords = false,
+    this.onReturnToSetup,
   });
 
   @override
@@ -202,6 +211,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   int _breakCount = 0;
   int _totalBreakSeconds = 0;
   DateTime? _breakStartedAt;
+  bool _timerDisplayActive = false;
 
   TimerSnapshot get _snapshot => _engine.snapshot();
 
@@ -217,6 +227,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     super.initState();
     _recordStore = widget.recordStore ?? JsonSessionRecordStore.local();
     _beginSession();
+    _activateTimerDisplay();
     _startTickerAfterBuild();
   }
 
@@ -232,13 +243,16 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     }
 
     _stopTicker();
+    _restoreTimerDisplay();
     _beginSession();
+    _activateTimerDisplay();
     _startTickerAfterBuild();
   }
 
   @override
   void dispose() {
     _stopTicker();
+    _restoreTimerDisplay();
     super.dispose();
   }
 
@@ -273,6 +287,22 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     _breakCount = 0;
     _totalBreakSeconds = 0;
     _breakStartedAt = null;
+  }
+
+  void _activateTimerDisplay() {
+    if (_timerDisplayActive) {
+      return;
+    }
+    _timerDisplayActive = true;
+    unawaited(widget.timerDisplayController.activate());
+  }
+
+  void _restoreTimerDisplay() {
+    if (!_timerDisplayActive) {
+      return;
+    }
+    _timerDisplayActive = false;
+    unawaited(widget.timerDisplayController.restore());
   }
 
   void _commit(List<TimerEvent> events) {
@@ -378,6 +408,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       } catch (_) {}
     }
     _stopTicker();
+    _restoreTimerDisplay();
     if (!mounted) {
       return;
     }
@@ -392,7 +423,17 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     setState(() {
       _beginSession();
     });
+    _activateTimerDisplay();
     _startTicker();
+  }
+
+  void _handleWrapUpComplete() {
+    final onReturnToSetup = widget.onReturnToSetup;
+    if (onReturnToSetup != null) {
+      onReturnToSetup();
+      return;
+    }
+    _reset();
   }
 
   void _finishActiveBreak(DateTime endedAt) {
@@ -412,7 +453,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
         draftRecord: wrapUpRecord,
         recordStore: _recordStore,
         recordWasAutoSaved: widget.autoSaveRecords,
-        onStartAnotherSession: _reset,
+        onStartAnotherSession: _handleWrapUpComplete,
       );
     }
 
@@ -432,31 +473,25 @@ final class _TimerHomePageState extends State<TimerHomePage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Flexible(
-                  flex: _panelFlex(participantA),
-                  child: _ClockPanel(
-                    key: const ValueKey('clock-left-zone'),
-                    participant: participantA,
-                    snapshot: snapshot,
-                    feedbackCues: _feedbackCues,
-                    showOvertime: showOvertime,
-                    canResume: canResume,
-                    isDark: false,
-                    onPassTurn: canPass ? _passTurn : null,
-                  ),
+                _ClockZone(
+                  zoneKey: const ValueKey('clock-left-zone'),
+                  participant: participantA,
+                  snapshot: snapshot,
+                  feedbackCues: _feedbackCues,
+                  showOvertime: showOvertime,
+                  canResume: canResume,
+                  isDark: false,
+                  onPassTurn: canPass ? _passTurn : null,
                 ),
-                Flexible(
-                  flex: _panelFlex(participantB),
-                  child: _ClockPanel(
-                    key: const ValueKey('clock-right-zone'),
-                    participant: participantB,
-                    snapshot: snapshot,
-                    feedbackCues: _feedbackCues,
-                    showOvertime: showOvertime,
-                    canResume: canResume,
-                    isDark: true,
-                    onPassTurn: canPass ? _passTurn : null,
-                  ),
+                _ClockZone(
+                  zoneKey: const ValueKey('clock-right-zone'),
+                  participant: participantB,
+                  snapshot: snapshot,
+                  feedbackCues: _feedbackCues,
+                  showOvertime: showOvertime,
+                  canResume: canResume,
+                  isDark: true,
+                  onPassTurn: canPass ? _passTurn : null,
                 ),
               ],
             ),
@@ -481,8 +516,47 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 }
 
-int _panelFlex(Participant participant) {
-  return math.max(1, participant.totalRemainingSeconds);
+final class _ClockZone extends StatelessWidget {
+  final Key zoneKey;
+  final Participant participant;
+  final TimerSnapshot snapshot;
+  final List<TimerFeedbackCue> feedbackCues;
+  final bool showOvertime;
+  final bool canResume;
+  final bool isDark;
+  final VoidCallback? onPassTurn;
+
+  const _ClockZone({
+    required this.zoneKey,
+    required this.participant,
+    required this.snapshot,
+    required this.feedbackCues,
+    required this.showOvertime,
+    required this.canResume,
+    required this.isDark,
+    required this.onPassTurn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final remainingSeconds = participant.totalRemainingSeconds;
+    if (remainingSeconds <= 0) {
+      return const SizedBox.shrink();
+    }
+    return Expanded(
+      flex: remainingSeconds,
+      child: _ClockPanel(
+        key: zoneKey,
+        participant: participant,
+        snapshot: snapshot,
+        feedbackCues: feedbackCues,
+        showOvertime: showOvertime,
+        canResume: canResume,
+        isDark: isDark,
+        onPassTurn: onPassTurn,
+      ),
+    );
+  }
 }
 
 final class _ClockPanel extends StatelessWidget {
@@ -624,33 +698,45 @@ final class _ClockControls extends StatelessWidget {
         phase == TimerPhase.runningOvertime ||
         (phase == TimerPhase.paused && canResume);
     final isPaused = phase == TimerPhase.paused;
+    final pauseKey = isPaused && canResume
+        ? const ValueKey('resume-session-button')
+        : const ValueKey('pause-session-button');
+    final pauseLabel = isPaused && canResume ? '재개' : '일시정지';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CupertinoButton(
-          color: const Color(0xFF303030),
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          onPressed: canPause ? onPauseOrResume : null,
-          child: Text(
-            isPaused && canResume ? '재개' : '일시정지',
-            style: const TextStyle(
+        Semantics(
+          button: true,
+          label: pauseLabel,
+          child: CupertinoButton(
+            key: pauseKey,
+            color: const Color(0xFF303030),
+            minimumSize: const Size(48, 48),
+            padding: EdgeInsets.zero,
+            onPressed: canPause ? onPauseOrResume : null,
+            child: Icon(
+              isPaused && canResume
+                  ? CupertinoIcons.play_arrow_solid
+                  : CupertinoIcons.pause_solid,
               color: CupertinoColors.white,
-              fontWeight: FontWeight.w800,
+              size: 24,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        CupertinoButton(
-          color: const Color(0xFF303030),
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          onPressed: phase == TimerPhase.finished ? null : onFinish,
-          child: const Text(
-            '종료',
-            style: TextStyle(
+        Semantics(
+          button: true,
+          label: '종료',
+          child: CupertinoButton(
+            key: const ValueKey('finish-session-button'),
+            color: const Color(0xFF303030),
+            minimumSize: const Size(48, 48),
+            padding: EdgeInsets.zero,
+            onPressed: phase == TimerPhase.finished ? null : onFinish,
+            child: const Icon(
+              CupertinoIcons.xmark,
               color: CupertinoColors.white,
-              fontWeight: FontWeight.w800,
+              size: 24,
             ),
           ),
         ),

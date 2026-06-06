@@ -69,8 +69,8 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('advanced-settings-button')));
     await tester.pumpAndSettle();
-    await _tapText(tester, '각자 30분');
-    await _tapText(tester, '턴 5분');
+    await _tapText(tester, '30분');
+    await _tapText(tester, '5분');
     await _tapText(tester, '시계로');
 
     await _tapText(tester, '시작');
@@ -115,7 +115,8 @@ final class _FailingAppSettingsStore implements AppSettingsStore {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
-  await _tapText(tester, '종료');
+  await tester.tap(find.byKey(const ValueKey('finish-session-button')));
+  await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
 }
