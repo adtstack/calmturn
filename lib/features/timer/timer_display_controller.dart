@@ -16,20 +16,29 @@ final class PlatformTimerDisplayController implements TimerDisplayController {
   Future<void> activate() async {
     await SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]);
+    await _setSensorLandscape(true);
     await _setKeepScreenOn(true);
   }
 
   @override
   Future<void> restore() async {
-    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    await _setSensorLandscape(false);
+    await SystemChrome.setPreferredOrientations(const []);
     await _setKeepScreenOn(false);
   }
 
+  Future<void> _setSensorLandscape(bool enabled) async {
+    await _invokeTimerDisplayMethod('setSensorLandscape', enabled);
+  }
+
   Future<void> _setKeepScreenOn(bool enabled) async {
+    await _invokeTimerDisplayMethod('setKeepScreenOn', enabled);
+  }
+
+  Future<void> _invokeTimerDisplayMethod(String method, bool enabled) async {
     try {
-      await _screenAwakeChannel.invokeMethod<void>('setKeepScreenOn', {
+      await _screenAwakeChannel.invokeMethod<void>(method, {
         'enabled': enabled,
       });
     } on MissingPluginException {

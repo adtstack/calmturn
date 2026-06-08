@@ -1,9 +1,10 @@
 package me.newlines.calmturn
 
+import android.content.pm.ActivityInfo
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import android.view.WindowManager
 
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -32,8 +33,19 @@ class MainActivity : FlutterActivity() {
                         } else {
                             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         }
+                        result.success(null)
                     }
-                    result.success(null)
+                }
+                "setSensorLandscape" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    runOnUiThread {
+                        requestedOrientation = if (enabled) {
+                            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        } else {
+                            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        }
+                        result.success(null)
+                    }
                 }
                 else -> result.notImplemented()
             }

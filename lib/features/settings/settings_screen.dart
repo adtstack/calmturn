@@ -246,6 +246,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 _ToggleRow(
+                  label: '턴 위기 점멸',
+                  value: _draft.turnDangerFlashEnabled,
+                  onChanged: (value) {
+                    _updateDraft(
+                      _draft.copyWith(turnDangerFlashEnabled: value),
+                    );
+                  },
+                ),
+                _ToggleRow(
                   label: '소리',
                   value: _draft.soundEnabled,
                   onChanged: (value) {

@@ -38,6 +38,7 @@ Future<void> main() async {
           );
           _expectEquals(loaded.alertConfig.warningBeforeSeconds, 5);
           _expectEquals(loaded.alertConfig.soundEnabled, true);
+          _expectEquals(loaded.alertConfig.turnDangerFlashEnabled, false);
         },
     'json app settings store clears saved session config': () async {
       final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
@@ -62,7 +63,19 @@ Future<void> main() async {
       _expectEquals(loaded.sessionDefaults.participantAName, 'A');
       _expectEquals(loaded.sessionDefaults.participantBName, 'B');
       _expectEquals(loaded.sessionDefaults.turnLimitSeconds, 60);
+      _expectEquals(loaded.sessionDefaults.turnDangerFlashEnabled, false);
     },
+    'json app settings store defaults missing turn danger flash to enabled':
+        () async {
+          final storage = InMemoryAppSettingsStorage();
+          await storage.write(_settingsJson(includeTurnDangerFlash: false));
+          final store = JsonAppSettingsStore(storage: storage);
+
+          final loaded = await store.loadSessionConfig();
+
+          _expect(loaded != null, 'old settings should still load');
+          _expectEquals(loaded!.alertConfig.turnDangerFlashEnabled, true);
+        },
     'json app settings store ignores corrupt settings': () async {
       final storage = InMemoryAppSettingsStorage();
       await storage.write('{not-json');
@@ -109,6 +122,7 @@ Future<void> main() async {
               visualEnabled: false,
               soundEnabled: false,
               hapticEnabled: false,
+              turnDangerFlashEnabled: false,
             ),
           );
           final store = JsonAppSettingsStore(storage: storage);
@@ -222,6 +236,7 @@ SessionConfig _config() {
       penaltyAlertEnabled: false,
       soundEnabled: true,
       hapticEnabled: false,
+      turnDangerFlashEnabled: false,
     ),
   );
 }
@@ -244,7 +259,25 @@ String _settingsJson({
   bool visualEnabled = true,
   bool soundEnabled = false,
   bool hapticEnabled = true,
+  bool turnDangerFlashEnabled = true,
+  bool includeTurnDangerFlash = true,
 }) {
+  final alertConfig = <String, Object?>{
+    'warningBeforeSeconds': warningBeforeSeconds,
+    'turnWarningEnabled': turnWarningEnabled,
+    'totalWarningEnabled': totalWarningEnabled,
+    'overtimeStartAlertEnabled': overtimeStartAlertEnabled,
+    'penaltyAlertEnabled': penaltyAlertEnabled,
+    'visualEnabled': visualEnabled,
+    'soundEnabled': soundEnabled,
+    'hapticEnabled': hapticEnabled,
+    'soundType': 'soft',
+    'hapticStrength': 'medium',
+  };
+  if (includeTurnDangerFlash) {
+    alertConfig['turnDangerFlashEnabled'] = turnDangerFlashEnabled;
+  }
+
   return jsonEncode({
     'version': 1,
     'sessionConfig': {
@@ -271,18 +304,7 @@ String _settingsJson({
         'repeatMode': PenaltyRepeatMode.oncePerTurn.name,
         'labelMode': PenaltyLabelMode.overtimeMark.name,
       },
-      'alertConfig': {
-        'warningBeforeSeconds': warningBeforeSeconds,
-        'turnWarningEnabled': turnWarningEnabled,
-        'totalWarningEnabled': totalWarningEnabled,
-        'overtimeStartAlertEnabled': overtimeStartAlertEnabled,
-        'penaltyAlertEnabled': penaltyAlertEnabled,
-        'visualEnabled': visualEnabled,
-        'soundEnabled': soundEnabled,
-        'hapticEnabled': hapticEnabled,
-        'soundType': 'soft',
-        'hapticStrength': 'medium',
-      },
+      'alertConfig': alertConfig,
       'requireBothConsentForExtension': true,
     },
   });

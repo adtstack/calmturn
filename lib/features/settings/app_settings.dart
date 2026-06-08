@@ -196,6 +196,7 @@ Map<String, Object?> _sessionConfigToJson(SessionConfig config) {
       'overtimeStartAlertEnabled': config.alertConfig.overtimeStartAlertEnabled,
       'penaltyAlertEnabled': config.alertConfig.penaltyAlertEnabled,
       'visualEnabled': config.alertConfig.visualEnabled,
+      'turnDangerFlashEnabled': config.alertConfig.turnDangerFlashEnabled,
       'soundEnabled': config.alertConfig.soundEnabled,
       'hapticEnabled': config.alertConfig.hapticEnabled,
       'soundType': config.alertConfig.soundType,
@@ -243,6 +244,8 @@ SessionConfig _sessionConfigFromJson(Map<String, Object?> json) {
       overtimeStartAlertEnabled: alertJson['overtimeStartAlertEnabled'] as bool,
       penaltyAlertEnabled: alertJson['penaltyAlertEnabled'] as bool,
       visualEnabled: alertJson['visualEnabled'] as bool,
+      turnDangerFlashEnabled:
+          alertJson['turnDangerFlashEnabled'] as bool? ?? true,
       soundEnabled: alertJson['soundEnabled'] as bool,
       hapticEnabled: alertJson['hapticEnabled'] as bool,
       soundType: alertJson['soundType'] as String,

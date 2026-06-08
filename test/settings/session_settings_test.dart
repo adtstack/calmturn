@@ -15,6 +15,7 @@ void main() {
       _expectEquals(config.penaltyConfig.thresholdSeconds, 60);
       _expectEquals(config.alertConfig.warningBeforeSeconds, 10);
       _expectEquals(config.alertConfig.visualEnabled, true);
+      _expectEquals(config.alertConfig.turnDangerFlashEnabled, true);
       _expectEquals(config.alertConfig.soundEnabled, false);
       _expectEquals(config.alertConfig.hapticEnabled, true);
     },
@@ -38,9 +39,36 @@ void main() {
           _expectEquals(config.participantB.totalAllocatedSeconds, 420);
           _expectEquals(config.penaltyConfig.thresholdSeconds, 30);
           _expectEquals(config.alertConfig.visualEnabled, true);
+          _expectEquals(config.alertConfig.turnDangerFlashEnabled, true);
           _expectEquals(config.alertConfig.soundEnabled, true);
           _expectEquals(config.alertConfig.hapticEnabled, true);
         },
+    'session config round-trips the independent turn danger flash setting': () {
+      final config = SessionSettingsDraft.fromSessionConfig(
+        SessionSettingsDraft.defaults()
+            .copyWith(turnDangerFlashEnabled: false)
+            .toSessionConfig(),
+      ).toSessionConfig();
+
+      _expectEquals(config.alertConfig.visualEnabled, true);
+      _expectEquals(config.alertConfig.turnDangerFlashEnabled, false);
+    },
+    'turn danger flash counts as its own alert delivery': () {
+      final message = validateSessionSettingsDraft(
+        SessionSettingsDraft.defaults().copyWith(
+          turnWarningEnabled: false,
+          totalWarningEnabled: false,
+          overtimeStartAlertEnabled: false,
+          penaltyAlertEnabled: false,
+          visualEnabled: false,
+          soundEnabled: false,
+          hapticEnabled: false,
+          turnDangerFlashEnabled: true,
+        ),
+      );
+
+      _expectEquals(message, null);
+    },
     'disabling overtime turns the turn limit behavior into auto pause': () {
       final config = SessionSettingsDraft.defaults()
           .copyWith(overtimeEnabled: false)
@@ -103,6 +131,7 @@ void main() {
           visualEnabled: false,
           soundEnabled: false,
           hapticEnabled: false,
+          turnDangerFlashEnabled: false,
         ),
       );
 
@@ -116,6 +145,7 @@ void main() {
           overtimeStartAlertEnabled: false,
           penaltyAlertEnabled: false,
           visualEnabled: true,
+          turnDangerFlashEnabled: false,
           soundEnabled: false,
           hapticEnabled: false,
         ),

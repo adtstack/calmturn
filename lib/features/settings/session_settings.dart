@@ -41,6 +41,7 @@ final class SessionSettingsDraft {
   final bool overtimeStartAlertEnabled;
   final bool penaltyAlertEnabled;
   final bool visualEnabled;
+  final bool turnDangerFlashEnabled;
   final bool soundEnabled;
   final bool hapticEnabled;
   final String soundType;
@@ -67,6 +68,7 @@ final class SessionSettingsDraft {
     required this.overtimeStartAlertEnabled,
     required this.penaltyAlertEnabled,
     required this.visualEnabled,
+    required this.turnDangerFlashEnabled,
     required this.soundEnabled,
     required this.hapticEnabled,
     required this.soundType,
@@ -100,6 +102,7 @@ final class SessionSettingsDraft {
       overtimeStartAlertEnabled: true,
       penaltyAlertEnabled: true,
       visualEnabled: true,
+      turnDangerFlashEnabled: true,
       soundEnabled: false,
       hapticEnabled: true,
       soundType: 'soft',
@@ -136,6 +139,7 @@ final class SessionSettingsDraft {
       overtimeStartAlertEnabled: config.alertConfig.overtimeStartAlertEnabled,
       penaltyAlertEnabled: config.alertConfig.penaltyAlertEnabled,
       visualEnabled: config.alertConfig.visualEnabled,
+      turnDangerFlashEnabled: config.alertConfig.turnDangerFlashEnabled,
       soundEnabled: config.alertConfig.soundEnabled,
       hapticEnabled: config.alertConfig.hapticEnabled,
       soundType: config.alertConfig.soundType,
@@ -196,6 +200,7 @@ final class SessionSettingsDraft {
         overtimeStartAlertEnabled: effectiveOvertimeStartAlertEnabled,
         penaltyAlertEnabled: effectivePenaltyAlertEnabled,
         visualEnabled: visualEnabled,
+        turnDangerFlashEnabled: turnDangerFlashEnabled,
         soundEnabled: soundEnabled,
         hapticEnabled: hapticEnabled,
         soundType: soundType,
@@ -225,6 +230,7 @@ final class SessionSettingsDraft {
     bool? overtimeStartAlertEnabled,
     bool? penaltyAlertEnabled,
     bool? visualEnabled,
+    bool? turnDangerFlashEnabled,
     bool? soundEnabled,
     bool? hapticEnabled,
     String? soundType,
@@ -255,6 +261,8 @@ final class SessionSettingsDraft {
           overtimeStartAlertEnabled ?? this.overtimeStartAlertEnabled,
       penaltyAlertEnabled: penaltyAlertEnabled ?? this.penaltyAlertEnabled,
       visualEnabled: visualEnabled ?? this.visualEnabled,
+      turnDangerFlashEnabled:
+          turnDangerFlashEnabled ?? this.turnDangerFlashEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       hapticEnabled: hapticEnabled ?? this.hapticEnabled,
       soundType: soundType ?? this.soundType,
@@ -293,6 +301,7 @@ String? validateSessionSettingsDraft(SessionSettingsDraft draft) {
         draft.penaltyEnabled &&
         draft.penaltyAlertEnabled,
     visualEnabled: draft.visualEnabled,
+    turnDangerFlashEnabled: draft.turnDangerFlashEnabled,
     soundEnabled: draft.soundEnabled,
     hapticEnabled: draft.hapticEnabled,
   );
@@ -330,6 +339,7 @@ String? validateSessionConfig(SessionConfig config) {
     overtimeStartAlertEnabled: config.alertConfig.overtimeStartAlertEnabled,
     penaltyAlertEnabled: config.alertConfig.penaltyAlertEnabled,
     visualEnabled: config.alertConfig.visualEnabled,
+    turnDangerFlashEnabled: config.alertConfig.turnDangerFlashEnabled,
     soundEnabled: config.alertConfig.soundEnabled,
     hapticEnabled: config.alertConfig.hapticEnabled,
   );
@@ -353,6 +363,7 @@ String? _validateSessionSettings({
   required bool overtimeStartAlertEnabled,
   required bool penaltyAlertEnabled,
   required bool visualEnabled,
+  required bool turnDangerFlashEnabled,
   required bool soundEnabled,
   required bool hapticEnabled,
 }) {
@@ -437,9 +448,11 @@ String? _validateSessionSettings({
     totalWarningEnabled: totalWarningEnabled,
     overtimeStartAlertEnabled: overtimeStartAlertEnabled,
     penaltyAlertEnabled: penaltyAlertEnabled,
+    turnDangerFlashEnabled: turnDangerFlashEnabled,
   );
   final activeAlertDeliveryCount = _activeAlertDeliveryCount(
     visualEnabled: visualEnabled,
+    turnDangerFlashEnabled: turnDangerFlashEnabled,
     soundEnabled: soundEnabled,
     hapticEnabled: hapticEnabled,
   );
@@ -497,6 +510,7 @@ int _activeAlertTargetCount({
   required bool totalWarningEnabled,
   required bool overtimeStartAlertEnabled,
   required bool penaltyAlertEnabled,
+  required bool turnDangerFlashEnabled,
 }) {
   var count = 0;
   if (turnWarningEnabled) {
@@ -511,16 +525,23 @@ int _activeAlertTargetCount({
   if (overtimeEnabled && penaltyEnabled && penaltyAlertEnabled) {
     count += 1;
   }
+  if (turnDangerFlashEnabled) {
+    count += 1;
+  }
   return count;
 }
 
 int _activeAlertDeliveryCount({
   required bool visualEnabled,
+  required bool turnDangerFlashEnabled,
   required bool soundEnabled,
   required bool hapticEnabled,
 }) {
   var count = 0;
   if (visualEnabled) {
+    count += 1;
+  }
+  if (turnDangerFlashEnabled) {
     count += 1;
   }
   if (soundEnabled) {

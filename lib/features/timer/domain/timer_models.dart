@@ -140,6 +140,7 @@ final class AlertConfig {
   final bool overtimeStartAlertEnabled;
   final bool penaltyAlertEnabled;
   final bool visualEnabled;
+  final bool turnDangerFlashEnabled;
   final bool soundEnabled;
   final bool hapticEnabled;
   final String soundType;
@@ -152,6 +153,7 @@ final class AlertConfig {
     this.overtimeStartAlertEnabled = true,
     this.penaltyAlertEnabled = true,
     this.visualEnabled = true,
+    this.turnDangerFlashEnabled = true,
     this.soundEnabled = false,
     this.hapticEnabled = true,
     this.soundType = 'soft',

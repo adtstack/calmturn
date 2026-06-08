@@ -98,6 +98,28 @@ void main() {
       expect(find.text('주의 표시 1분'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'advanced settings save the independent turn danger flash toggle',
+    (tester) async {
+      final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+      await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('advanced-settings-button')));
+      await tester.pumpAndSettle();
+
+      await _tapText(tester, '턴 위기 점멸');
+      await _tapText(tester, '시계로');
+
+      final loaded = await store.loadSettings();
+      expect(loaded.sessionDefaults.turnDangerFlashEnabled, isFalse);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {

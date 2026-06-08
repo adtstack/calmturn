@@ -26,7 +26,7 @@ void main() {
     expect(find.byKey(const ValueKey('pause-session-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('finish-session-button')), findsOneWidget);
 
-    await tester.tap(leftZone);
+    await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
     await tester.pump();
 
     expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
@@ -50,7 +50,7 @@ void main() {
     expect(initialLeftWidth, closeTo(initialRightWidth, 1));
 
     await tester.pump(const Duration(seconds: 60));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     expect(tester.getSize(leftZone).width, lessThan(initialLeftWidth));
     expect(tester.getSize(rightZone).width, greaterThan(initialRightWidth));
@@ -59,7 +59,34 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('active speaker zone disappears when total time reaches zero', (
+  testWidgets('clock boundary eases toward the new remaining-time ratio', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    final initialLeftWidth = tester.getSize(leftZone).width;
+
+    await _pumpTimer(tester, _config(aTotalSeconds: 240, bTotalSeconds: 300));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final easingLeftWidth = tester.getSize(leftZone).width;
+
+    await tester.pump(const Duration(milliseconds: 800));
+
+    final settledLeftWidth = tester.getSize(leftZone).width;
+    expect(easingLeftWidth, lessThan(initialLeftWidth));
+    expect(easingLeftWidth, greaterThan(settledLeftWidth + 12));
+    expect(settledLeftWidth, closeTo(1000 * 240 / 540, 2));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('active speaker zone shrinks away when total time reaches zero', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 400));
@@ -71,7 +98,7 @@ void main() {
     expect(find.byKey(const ValueKey('clock-right-zone')), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.byKey(const ValueKey('clock-left-zone')), findsNothing);
     final rightZone = find.byKey(const ValueKey('clock-right-zone'));
@@ -82,19 +109,95 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('clock readouts do not scale down with shrinking zones', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    expect(
+      find.descendant(
+        of: find.byType(TimerHomePage),
+        matching: find.byType(FittedBox),
+      ),
+      findsNothing,
+    );
+
+    await tester.pump(const Duration(seconds: 48));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    expect(find.text('0:12'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(TimerHomePage),
+        matching: find.byType(FittedBox),
+      ),
+      findsNothing,
+    );
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('turn danger flash starts at twenty percent and intensifies', (
+    tester,
+  ) async {
+    await _pumpTimer(tester, _config());
+
+    await tester.pump(const Duration(seconds: 47));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('turn-danger-flash-overlay')),
+      findsNothing,
+    );
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    final weakOpacity = _dangerFlashOpacity(tester);
+
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump();
+    final strongOpacity = _dangerFlashOpacity(tester);
+
+    expect(weakOpacity, greaterThan(0));
+    expect(strongOpacity, greaterThan(weakOpacity));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('turn danger flash can be disabled independently', (
+    tester,
+  ) async {
+    await _pumpTimer(
+      tester,
+      _config(alertConfig: const AlertConfig(turnDangerFlashEnabled: false)),
+    );
+
+    await tester.pump(const Duration(seconds: 54));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('turn-danger-flash-overlay')),
+      findsNothing,
+    );
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('timer keeps the display awake and landscape while active', (
     tester,
   ) async {
-    final screenAwakeCalls = <bool>[];
+    final screenAwakeCalls = <MethodCall>[];
     final platformCalls = <MethodCall>[];
     const screenAwakeChannel = MethodChannel('calmturn/screen_awake');
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       screenAwakeChannel,
       (call) async {
-        if (call.method == 'setKeepScreenOn') {
-          final arguments = Map<Object?, Object?>.from(call.arguments as Map);
-          screenAwakeCalls.add(arguments['enabled']! as bool);
-        }
+        screenAwakeCalls.add(call);
         return null;
       },
     );
@@ -118,18 +221,21 @@ void main() {
 
     await _pumpTimer(tester, _config());
 
-    expect(screenAwakeCalls, contains(true));
-    expect(
-      platformCalls.where(
-        (call) => call.method == 'SystemChrome.setPreferredOrientations',
-      ),
-      isNotEmpty,
-    );
+    expect(_enabledCalls(screenAwakeCalls, 'setSensorLandscape'), [true]);
+    expect(_enabledCalls(screenAwakeCalls, 'setKeepScreenOn'), [true]);
+    expect(_orientationArguments(platformCalls).first, [
+      'DeviceOrientation.landscapeLeft',
+    ]);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
 
-    expect(screenAwakeCalls.last, isFalse);
+    expect(_enabledCalls(screenAwakeCalls, 'setSensorLandscape'), [
+      true,
+      false,
+    ]);
+    expect(_enabledCalls(screenAwakeCalls, 'setKeepScreenOn'), [true, false]);
+    expect(_orientationArguments(platformCalls).last, isEmpty);
   });
 
   testWidgets('pause resumes in place and finish requires confirmation', (
@@ -208,10 +314,35 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
+List<List<Object?>> _orientationArguments(List<MethodCall> calls) {
+  return calls
+      .where((call) => call.method == 'SystemChrome.setPreferredOrientations')
+      .map((call) => List<Object?>.from(call.arguments as List))
+      .toList(growable: false);
+}
+
+List<bool> _enabledCalls(List<MethodCall> calls, String method) {
+  return calls
+      .where((call) => call.method == method)
+      .map((call) {
+        final arguments = Map<Object?, Object?>.from(call.arguments as Map);
+        return arguments['enabled']! as bool;
+      })
+      .toList(growable: false);
+}
+
+double _dangerFlashOpacity(WidgetTester tester) {
+  final overlay = tester.widget<Opacity>(
+    find.byKey(const ValueKey('turn-danger-flash-overlay')),
+  );
+  return overlay.opacity;
+}
+
 SessionConfig _config({
   int aTotalSeconds = 300,
   int bTotalSeconds = 300,
   PenaltyConfig penaltyConfig = const PenaltyConfig(),
+  AlertConfig alertConfig = const AlertConfig(),
 }) {
   return SessionConfig(
     participantA: ParticipantConfig(
@@ -228,6 +359,6 @@ SessionConfig _config({
     firstSpeakerId: 'a',
     overtimeConfig: const OvertimeConfig(),
     penaltyConfig: penaltyConfig,
-    alertConfig: const AlertConfig(),
+    alertConfig: alertConfig,
   );
 }

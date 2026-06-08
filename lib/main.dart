@@ -18,6 +18,8 @@ import 'features/timer/domain/timer_models.dart';
 import 'features/timer/timer_display_controller.dart';
 import 'features/timer/timer_feedback.dart';
 
+const _clockBoundaryAnimationDuration = Duration(milliseconds: 700);
+
 void main() {
   platform_storage.configurePlatformAppSettingsStorage();
   runApp(const CalmTurnApp());
@@ -470,30 +472,17 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       child: SafeArea(
         child: Stack(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _ClockZone(
-                  zoneKey: const ValueKey('clock-left-zone'),
-                  participant: participantA,
-                  snapshot: snapshot,
-                  feedbackCues: _feedbackCues,
-                  showOvertime: showOvertime,
-                  canResume: canResume,
-                  isDark: false,
-                  onPassTurn: canPass ? _passTurn : null,
-                ),
-                _ClockZone(
-                  zoneKey: const ValueKey('clock-right-zone'),
-                  participant: participantB,
-                  snapshot: snapshot,
-                  feedbackCues: _feedbackCues,
-                  showOvertime: showOvertime,
-                  canResume: canResume,
-                  isDark: true,
-                  onPassTurn: canPass ? _passTurn : null,
-                ),
-              ],
+            _ClockZoneLayout(
+              participantA: participantA,
+              participantB: participantB,
+              snapshot: snapshot,
+              feedbackCues: _feedbackCues,
+              turnLimitSeconds: widget.config.turnLimitSeconds,
+              turnDangerFlashEnabled:
+                  widget.config.alertConfig.turnDangerFlashEnabled,
+              showOvertime: showOvertime,
+              canResume: canResume,
+              onPassTurn: canPass ? _passTurn : null,
             ),
             Positioned(
               top: 14,
@@ -516,50 +505,224 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 }
 
-final class _ClockZone extends StatelessWidget {
-  final Key zoneKey;
-  final Participant participant;
+final class _ClockZoneLayout extends StatelessWidget {
+  final Participant participantA;
+  final Participant participantB;
   final TimerSnapshot snapshot;
   final List<TimerFeedbackCue> feedbackCues;
+  final int turnLimitSeconds;
+  final bool turnDangerFlashEnabled;
   final bool showOvertime;
   final bool canResume;
-  final bool isDark;
   final VoidCallback? onPassTurn;
 
-  const _ClockZone({
-    required this.zoneKey,
-    required this.participant,
+  const _ClockZoneLayout({
+    required this.participantA,
+    required this.participantB,
     required this.snapshot,
     required this.feedbackCues,
+    required this.turnLimitSeconds,
+    required this.turnDangerFlashEnabled,
     required this.showOvertime,
     required this.canResume,
-    required this.isDark,
     required this.onPassTurn,
   });
 
   @override
   Widget build(BuildContext context) {
-    final remainingSeconds = participant.totalRemainingSeconds;
-    if (remainingSeconds <= 0) {
+    final totalRemainingSeconds =
+        participantA.totalRemainingSeconds + participantB.totalRemainingSeconds;
+    if (totalRemainingSeconds <= 0) {
       return const SizedBox.shrink();
     }
-    return Expanded(
-      flex: remainingSeconds,
-      child: _ClockPanel(
-        key: zoneKey,
-        participant: participant,
-        snapshot: snapshot,
-        feedbackCues: feedbackCues,
-        showOvertime: showOvertime,
-        canResume: canResume,
-        isDark: isDark,
-        onPassTurn: onPassTurn,
+
+    final leftTargetFraction =
+        participantA.totalRemainingSeconds / totalRemainingSeconds;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        if (!totalWidth.isFinite || totalWidth <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(
+            begin: leftTargetFraction,
+            end: leftTargetFraction,
+          ),
+          duration: _clockBoundaryAnimationDuration,
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedLeftFraction, child) {
+            final leftFraction = animatedLeftFraction.clamp(0.0, 1.0);
+            final leftWidth = totalWidth * leftFraction;
+            final rightWidth = totalWidth - leftWidth;
+            final showLeft = _shouldShowClockZone(participantA, leftWidth);
+            final showRight = _shouldShowClockZone(participantB, rightWidth);
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showLeft)
+                      SizedBox(
+                        key: const ValueKey('clock-left-zone'),
+                        width: leftWidth,
+                        child: const _ClockZoneBackground(isDark: false),
+                      ),
+                    if (showRight)
+                      SizedBox(
+                        key: const ValueKey('clock-right-zone'),
+                        width: rightWidth,
+                        child: const _ClockZoneBackground(isDark: true),
+                      ),
+                  ],
+                ),
+                _TurnDangerFlash(
+                  snapshot: snapshot,
+                  turnLimitSeconds: turnLimitSeconds,
+                  enabled: turnDangerFlashEnabled,
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showLeft)
+                      Expanded(
+                        child: _ClockReadout(
+                          participant: participantA,
+                          snapshot: snapshot,
+                          feedbackCues: feedbackCues,
+                          showOvertime: showOvertime,
+                          canResume: canResume,
+                          isDark: false,
+                          onPassTurn: onPassTurn,
+                        ),
+                      ),
+                    if (showRight)
+                      Expanded(
+                        child: _ClockReadout(
+                          participant: participantB,
+                          snapshot: snapshot,
+                          feedbackCues: feedbackCues,
+                          showOvertime: showOvertime,
+                          canResume: canResume,
+                          isDark: true,
+                          onPassTurn: onPassTurn,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+bool _shouldShowClockZone(Participant participant, double width) {
+  return participant.totalRemainingSeconds > 0 || width > 0.5;
+}
+
+final class _ClockZoneBackground extends StatelessWidget {
+  final bool isDark;
+
+  const _ClockZoneBackground({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final background = isDark
+        ? const Color(0xFF171717)
+        : const Color(0xFFF7F7F4);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        border: Border(
+          right: isDark
+              ? BorderSide.none
+              : const BorderSide(color: Color(0xFFE1E1DC)),
+        ),
       ),
     );
   }
 }
 
-final class _ClockPanel extends StatelessWidget {
+final class _TurnDangerFlash extends StatelessWidget {
+  final TimerSnapshot snapshot;
+  final int turnLimitSeconds;
+  final bool enabled;
+
+  const _TurnDangerFlash({
+    required this.snapshot,
+    required this.turnLimitSeconds,
+    required this.enabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final level = _turnDangerFlashLevel(
+      snapshot: snapshot,
+      turnLimitSeconds: turnLimitSeconds,
+      enabled: enabled,
+    );
+    if (level == 0) {
+      return const SizedBox.shrink();
+    }
+
+    final pulseSeed = snapshot.phase == TimerPhase.runningOvertime
+        ? snapshot.currentTurnOvertimeSeconds
+        : snapshot.currentTurnRemainingSeconds;
+    final pulseHigh = pulseSeed.isEven;
+    final opacity = switch (level) {
+      1 => pulseHigh ? 0.18 : 0.08,
+      _ => pulseHigh ? 0.34 : 0.16,
+    };
+
+    return IgnorePointer(
+      child: Opacity(
+        key: const ValueKey('turn-danger-flash-overlay'),
+        opacity: opacity,
+        child: const ColoredBox(color: Color(0xFFEF3B2D)),
+      ),
+    );
+  }
+}
+
+int _turnDangerFlashLevel({
+  required TimerSnapshot snapshot,
+  required int turnLimitSeconds,
+  required bool enabled,
+}) {
+  if (!enabled || turnLimitSeconds <= 0) {
+    return 0;
+  }
+  if (snapshot.phase == TimerPhase.runningOvertime) {
+    return 2;
+  }
+  if (snapshot.phase != TimerPhase.runningNormal) {
+    return 0;
+  }
+
+  final remainingSeconds = snapshot.currentTurnRemainingSeconds;
+  if (remainingSeconds <= 0) {
+    return 0;
+  }
+
+  final warningThresholdSeconds = (turnLimitSeconds * 0.2).ceil();
+  final criticalThresholdSeconds = (turnLimitSeconds * 0.1).ceil();
+  if (remainingSeconds <= criticalThresholdSeconds) {
+    return 2;
+  }
+  if (remainingSeconds <= warningThresholdSeconds) {
+    return 1;
+  }
+  return 0;
+}
+
+final class _ClockReadout extends StatelessWidget {
   final Participant participant;
   final TimerSnapshot snapshot;
   final List<TimerFeedbackCue> feedbackCues;
@@ -568,8 +731,7 @@ final class _ClockPanel extends StatelessWidget {
   final bool isDark;
   final VoidCallback? onPassTurn;
 
-  const _ClockPanel({
-    super.key,
+  const _ClockReadout({
     required this.participant,
     required this.snapshot,
     required this.feedbackCues,
@@ -585,9 +747,12 @@ final class _ClockPanel extends StatelessWidget {
     final isOvertime = snapshot.phase == TimerPhase.runningOvertime && isActive;
     final foreground = isDark ? CupertinoColors.white : const Color(0xFF111111);
     final muted = isDark ? const Color(0xFFC9C9C9) : const Color(0xFF5F6460);
-    final background = isDark
-        ? const Color(0xFF171717)
-        : const Color(0xFFF7F7F4);
+    final textShadows = [
+      Shadow(
+        color: isDark ? const Color(0x99000000) : const Color(0x99FFFFFF),
+        blurRadius: 10,
+      ),
+    ];
     final timeText = isActive
         ? isOvertime
               ? showOvertime
@@ -608,66 +773,64 @@ final class _ClockPanel extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onPassTurn,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: background,
-            border: Border(
-              right: isDark
-                  ? BorderSide.none
-                  : const BorderSide(color: Color(0xFFE1E1DC)),
-            ),
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 54, 18, 28),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: SizedBox(
-                  width: 360,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        participant.name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: foreground,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 54, 18, 28),
+            child: OverflowBox(
+              maxWidth: 360,
+              child: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      participant.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        shadows: textShadows,
                       ),
-                      const SizedBox(height: 22),
-                      Text(
-                        timeText,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        style: TextStyle(
-                          color: foreground,
-                          fontSize: isOvertime && showOvertime ? 58 : 82,
-                          fontWeight: FontWeight.w900,
-                        ),
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      timeText,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: isOvertime && showOvertime ? 58 : 82,
+                        fontWeight: FontWeight.w900,
+                        shadows: textShadows,
                       ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      _panelStatus(
+                        participant,
+                        snapshot,
+                        isActive: isActive,
+                        canResume: canResume,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        shadows: textShadows,
+                      ),
+                    ),
+                    if (isActive && feedbackCues.isNotEmpty) ...[
                       const SizedBox(height: 14),
-                      Text(
-                        _panelStatus(
-                          participant,
-                          snapshot,
-                          isActive: isActive,
-                          canResume: canResume,
-                        ),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: muted,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (isActive && feedbackCues.isNotEmpty) ...[
-                        const SizedBox(height: 14),
-                        _FeedbackBanner(cues: feedbackCues),
-                      ],
+                      _FeedbackBanner(cues: feedbackCues),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
