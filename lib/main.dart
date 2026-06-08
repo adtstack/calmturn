@@ -19,6 +19,7 @@ import 'features/timer/timer_display_controller.dart';
 import 'features/timer/timer_feedback.dart';
 
 const _clockBoundaryAnimationDuration = Duration(milliseconds: 700);
+const _clockBoundaryVisualGain = 2.5;
 
 void main() {
   platform_storage.configurePlatformAppSettingsStorage();
@@ -476,7 +477,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
               participantA: participantA,
               participantB: participantB,
               snapshot: snapshot,
-              feedbackCues: _feedbackCues,
               turnLimitSeconds: widget.config.turnLimitSeconds,
               turnDangerFlashEnabled:
                   widget.config.alertConfig.turnDangerFlashEnabled,
@@ -494,6 +494,20 @@ final class _TimerHomePageState extends State<TimerHomePage> {
                 onFinish: _confirmFinish,
               ),
             ),
+            if (_feedbackCues.isNotEmpty)
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: 18,
+                child: IgnorePointer(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: _FeedbackBanner(cues: _feedbackCues),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -509,7 +523,6 @@ final class _ClockZoneLayout extends StatelessWidget {
   final Participant participantA;
   final Participant participantB;
   final TimerSnapshot snapshot;
-  final List<TimerFeedbackCue> feedbackCues;
   final int turnLimitSeconds;
   final bool turnDangerFlashEnabled;
   final bool showOvertime;
@@ -520,7 +533,6 @@ final class _ClockZoneLayout extends StatelessWidget {
     required this.participantA,
     required this.participantB,
     required this.snapshot,
-    required this.feedbackCues,
     required this.turnLimitSeconds,
     required this.turnDangerFlashEnabled,
     required this.showOvertime,
@@ -536,8 +548,9 @@ final class _ClockZoneLayout extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final leftTargetFraction =
-        participantA.totalRemainingSeconds / totalRemainingSeconds;
+    final leftTargetFraction = _visualClockFraction(
+      participantA.totalRemainingSeconds / totalRemainingSeconds,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -593,7 +606,6 @@ final class _ClockZoneLayout extends StatelessWidget {
                         child: _ClockReadout(
                           participant: participantA,
                           snapshot: snapshot,
-                          feedbackCues: feedbackCues,
                           showOvertime: showOvertime,
                           canResume: canResume,
                           isDark: false,
@@ -605,7 +617,6 @@ final class _ClockZoneLayout extends StatelessWidget {
                         child: _ClockReadout(
                           participant: participantB,
                           snapshot: snapshot,
-                          feedbackCues: feedbackCues,
                           showOvertime: showOvertime,
                           canResume: canResume,
                           isDark: true,
@@ -625,6 +636,16 @@ final class _ClockZoneLayout extends StatelessWidget {
 
 bool _shouldShowClockZone(Participant participant, double width) {
   return participant.totalRemainingSeconds > 0 || width > 0.5;
+}
+
+double _visualClockFraction(double rawFraction) {
+  final fraction = rawFraction.clamp(0.0, 1.0);
+  final edgeDamping =
+      16 * fraction * fraction * (1 - fraction) * (1 - fraction);
+  final amplified =
+      fraction +
+      (fraction - 0.5) * (_clockBoundaryVisualGain - 1) * edgeDamping;
+  return amplified.clamp(0.0, 1.0);
 }
 
 final class _ClockZoneBackground extends StatelessWidget {
@@ -725,7 +746,6 @@ int _turnDangerFlashLevel({
 final class _ClockReadout extends StatelessWidget {
   final Participant participant;
   final TimerSnapshot snapshot;
-  final List<TimerFeedbackCue> feedbackCues;
   final bool showOvertime;
   final bool canResume;
   final bool isDark;
@@ -734,7 +754,6 @@ final class _ClockReadout extends StatelessWidget {
   const _ClockReadout({
     required this.participant,
     required this.snapshot,
-    required this.feedbackCues,
     required this.showOvertime,
     required this.canResume,
     required this.isDark,
@@ -826,10 +845,6 @@ final class _ClockReadout extends StatelessWidget {
                         shadows: textShadows,
                       ),
                     ),
-                    if (isActive && feedbackCues.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      _FeedbackBanner(cues: feedbackCues),
-                    ],
                   ],
                 ),
               ),

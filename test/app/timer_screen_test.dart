@@ -59,7 +59,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('clock boundary eases toward the new remaining-time ratio', (
+  testWidgets('clock boundary eases toward a visible remaining-time ratio', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 400));
@@ -80,7 +80,32 @@ void main() {
     final settledLeftWidth = tester.getSize(leftZone).width;
     expect(easingLeftWidth, lessThan(initialLeftWidth));
     expect(easingLeftWidth, greaterThan(settledLeftWidth + 12));
-    expect(settledLeftWidth, closeTo(1000 * 240 / 540, 2));
+    expect(settledLeftWidth, lessThan((1000 * 240 / 540) - 40));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('clock background moves while the readout stays anchored', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    final leftReadout = find.bySemanticsLabel(RegExp('A.*말하는 중'));
+    final initialZoneWidth = tester.getSize(leftZone).width;
+    final initialReadoutWidth = tester.getSize(leftReadout).width;
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    final tickedZoneWidth = tester.getSize(leftZone).width;
+    final tickedReadoutWidth = tester.getSize(leftReadout).width;
+    expect(initialZoneWidth - tickedZoneWidth, greaterThan(1.5));
+    expect(tickedReadoutWidth, closeTo(initialReadoutWidth, 1));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -104,6 +129,31 @@ void main() {
     final rightZone = find.byKey(const ValueKey('clock-right-zone'));
     expect(rightZone, findsOneWidget);
     expect(tester.getSize(rightZone).width, greaterThan(950));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('feedback banner overlays without moving the clock readout', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    await tester.pump(const Duration(seconds: 49));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    final nameFinder = find.text('A');
+    final nameTopBeforeWarning = tester.getTopLeft(nameFinder).dy;
+    expect(find.text('10초 남았습니다.'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+
+    expect(find.text('10초 남았습니다.'), findsOneWidget);
+    expect(tester.getTopLeft(nameFinder).dy, closeTo(nameTopBeforeWarning, 1));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
