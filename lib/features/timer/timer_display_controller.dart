@@ -17,6 +17,7 @@ final class PlatformTimerDisplayController implements TimerDisplayController {
     await SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
     ]);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     await _setSensorLandscape(true);
     await _setKeepScreenOn(true);
   }
@@ -26,6 +27,7 @@ final class PlatformTimerDisplayController implements TimerDisplayController {
     await _setSensorLandscape(false);
     await SystemChrome.setPreferredOrientations(const []);
     await _setKeepScreenOn(false);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
   Future<void> _setSensorLandscape(bool enabled) async {

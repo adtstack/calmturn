@@ -23,6 +23,10 @@ void main() {
     expect(find.text('차례 넘기기'), findsNothing);
     expect(find.text('일시정지'), findsNothing);
     expect(find.text('종료'), findsNothing);
+    expect(find.byKey(const ValueKey('pause-session-button')), findsNothing);
+    expect(find.byKey(const ValueKey('finish-session-button')), findsNothing);
+
+    await _showControls(tester);
     expect(find.byKey(const ValueKey('pause-session-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('finish-session-button')), findsOneWidget);
 
@@ -30,6 +34,31 @@ void main() {
     await tester.pump();
 
     expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('fullscreen clock fills the surface beyond safe area padding', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(844, 390));
+    tester.view.padding = const FakeViewPadding(
+      left: 34,
+      top: 18,
+      right: 26,
+      bottom: 12,
+    );
+    addTearDown(() {
+      tester.binding.setSurfaceSize(null);
+      tester.view.resetPadding();
+    });
+
+    await _pumpTimer(tester, _config());
+
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    expect(tester.getTopLeft(leftZone).dy, 0);
+    expect(tester.getSize(leftZone).height, closeTo(390, 1));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -49,9 +78,11 @@ void main() {
     final initialRightWidth = tester.getSize(rightZone).width;
     expect(initialLeftWidth, closeTo(initialRightWidth, 1));
 
-    await tester.pump(const Duration(seconds: 60));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump(const Duration(milliseconds: 800));
 
+    expect(tester.getSize(leftZone).width, closeTo(250, 2));
+    expect(tester.getSize(rightZone).width, closeTo(750, 2));
     expect(tester.getSize(leftZone).width, lessThan(initialLeftWidth));
     expect(tester.getSize(rightZone).width, greaterThan(initialRightWidth));
 
@@ -59,7 +90,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('clock boundary eases toward a visible remaining-time ratio', (
+  testWidgets('clock boundary follows current turn screen progress', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 400));
@@ -70,7 +101,7 @@ void main() {
     final leftZone = find.byKey(const ValueKey('clock-left-zone'));
     final initialLeftWidth = tester.getSize(leftZone).width;
 
-    await _pumpTimer(tester, _config(aTotalSeconds: 240, bTotalSeconds: 300));
+    await tester.pump(const Duration(seconds: 30));
     await tester.pump(const Duration(milliseconds: 200));
 
     final easingLeftWidth = tester.getSize(leftZone).width;
@@ -79,8 +110,8 @@ void main() {
 
     final settledLeftWidth = tester.getSize(leftZone).width;
     expect(easingLeftWidth, lessThan(initialLeftWidth));
-    expect(easingLeftWidth, greaterThan(settledLeftWidth + 12));
-    expect(settledLeftWidth, lessThan((1000 * 240 / 540) - 40));
+    expect(easingLeftWidth, greaterThan(settledLeftWidth + 40));
+    expect(settledLeftWidth, closeTo(250, 2));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -104,8 +135,37 @@ void main() {
 
     final tickedZoneWidth = tester.getSize(leftZone).width;
     final tickedReadoutWidth = tester.getSize(leftReadout).width;
-    expect(initialZoneWidth - tickedZoneWidth, greaterThan(1.5));
+    expect(initialZoneWidth - tickedZoneWidth, greaterThan(7));
     expect(tickedReadoutWidth, closeTo(initialReadoutWidth, 1));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('next speaker starts the background boundary from center', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(tester.getSize(leftZone).width, closeTo(250, 2));
+
+    await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
+    await tester.pump();
+
+    expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
+    expect(tester.getSize(leftZone).width, closeTo(500, 1));
+
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    expect(tester.getSize(leftZone).width, greaterThan(507));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -276,6 +336,10 @@ void main() {
     expect(_orientationArguments(platformCalls).first, [
       'DeviceOrientation.landscapeLeft',
     ]);
+    expect(
+      _systemUiModeArguments(platformCalls).first,
+      'SystemUiMode.immersiveSticky',
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -286,6 +350,10 @@ void main() {
     ]);
     expect(_enabledCalls(screenAwakeCalls, 'setKeepScreenOn'), [true, false]);
     expect(_orientationArguments(platformCalls).last, isEmpty);
+    expect(
+      _systemUiModeArguments(platformCalls).last,
+      'SystemUiMode.edgeToEdge',
+    );
   });
 
   testWidgets('pause resumes in place and finish requires confirmation', (
@@ -293,6 +361,7 @@ void main() {
   ) async {
     await _pumpTimer(tester, _config());
 
+    await _showControls(tester);
     await tester.tap(find.byKey(const ValueKey('pause-session-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('resume-session-button')), findsOneWidget);
@@ -350,10 +419,29 @@ Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
+  await _showControls(tester);
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
   await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
+}
+
+Future<void> _showControls(WidgetTester tester) async {
+  final controlsAreVisible =
+      find
+          .byKey(const ValueKey('pause-session-button'))
+          .evaluate()
+          .isNotEmpty ||
+      find
+          .byKey(const ValueKey('resume-session-button'))
+          .evaluate()
+          .isNotEmpty ||
+      find.byKey(const ValueKey('finish-session-button')).evaluate().isNotEmpty;
+  if (controlsAreVisible) {
+    return;
+  }
+  await tester.tap(find.byKey(const ValueKey('clock-controls-reveal-zone')));
+  await tester.pump();
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {
@@ -368,6 +456,13 @@ List<List<Object?>> _orientationArguments(List<MethodCall> calls) {
   return calls
       .where((call) => call.method == 'SystemChrome.setPreferredOrientations')
       .map((call) => List<Object?>.from(call.arguments as List))
+      .toList(growable: false);
+}
+
+List<Object?> _systemUiModeArguments(List<MethodCall> calls) {
+  return calls
+      .where((call) => call.method == 'SystemChrome.setEnabledSystemUIMode')
+      .map((call) => call.arguments)
       .toList(growable: false);
 }
 

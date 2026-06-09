@@ -176,10 +176,29 @@ Future<void> _ensureTextVisible(WidgetTester tester, String text) async {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
+  await _showControls(tester);
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
   await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
+}
+
+Future<void> _showControls(WidgetTester tester) async {
+  final controlsAreVisible =
+      find
+          .byKey(const ValueKey('pause-session-button'))
+          .evaluate()
+          .isNotEmpty ||
+      find
+          .byKey(const ValueKey('resume-session-button'))
+          .evaluate()
+          .isNotEmpty ||
+      find.byKey(const ValueKey('finish-session-button')).evaluate().isNotEmpty;
+  if (controlsAreVisible) {
+    return;
+  }
+  await tester.tap(find.byKey(const ValueKey('clock-controls-reveal-zone')));
+  await tester.pump();
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {

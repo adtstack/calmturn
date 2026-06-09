@@ -115,10 +115,22 @@ final class _FailingAppSettingsStore implements AppSettingsStore {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
+  await _showControls(tester);
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
   await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
+}
+
+Future<void> _showControls(WidgetTester tester) async {
+  if (find
+      .byKey(const ValueKey('finish-session-button'))
+      .evaluate()
+      .isNotEmpty) {
+    return;
+  }
+  await tester.tap(find.byKey(const ValueKey('clock-controls-reveal-zone')));
+  await tester.pump();
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {
