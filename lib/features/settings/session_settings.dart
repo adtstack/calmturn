@@ -82,8 +82,8 @@ final class SessionSettingsDraft {
 
   factory SessionSettingsDraft.defaults() {
     return const SessionSettingsDraft(
-      participantAName: '남편',
-      participantBName: '와이프',
+      participantAName: '',
+      participantBName: '',
       totalTimeMode: TotalTimeMode.same,
       sharedTotalSeconds: 600,
       participantATotalSeconds: 600,
@@ -172,12 +172,12 @@ final class SessionSettingsDraft {
     return SessionConfig(
       participantA: ParticipantConfig(
         id: participantAId,
-        name: _cleanName(participantAName, '말하는 사람 A'),
+        name: _cleanName(participantAName),
         totalAllocatedSeconds: effectiveParticipantATotalSeconds,
       ),
       participantB: ParticipantConfig(
         id: participantBId,
-        name: _cleanName(participantBName, '말하는 사람 B'),
+        name: _cleanName(participantBName),
         totalAllocatedSeconds: effectiveParticipantBTotalSeconds,
       ),
       turnLimitSeconds: turnLimitSeconds,
@@ -271,9 +271,9 @@ final class SessionSettingsDraft {
   }
 }
 
-String _cleanName(String value, String fallback) {
+String _cleanName(String value) {
   final trimmed = value.trim();
-  return trimmed.isEmpty ? fallback : trimmed;
+  return trimmed;
 }
 
 String? validateSessionSettingsDraft(SessionSettingsDraft draft) {

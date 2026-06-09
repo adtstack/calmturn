@@ -6,8 +6,8 @@ void main() {
     'default draft builds the v4 session config': () {
       final config = SessionSettingsDraft.defaults().toSessionConfig();
 
-      _expectEquals(config.participantA.name, '남편');
-      _expectEquals(config.participantB.name, '와이프');
+      _expectEquals(config.participantA.name, '');
+      _expectEquals(config.participantB.name, '');
       _expectEquals(config.participantA.totalAllocatedSeconds, 600);
       _expectEquals(config.participantB.totalAllocatedSeconds, 600);
       _expectEquals(config.turnLimitSeconds, 180);
@@ -18,6 +18,14 @@ void main() {
       _expectEquals(config.alertConfig.turnDangerFlashEnabled, true);
       _expectEquals(config.alertConfig.soundEnabled, false);
       _expectEquals(config.alertConfig.hapticEnabled, true);
+    },
+    'blank participant names stay blank in session configs': () {
+      final config = SessionSettingsDraft.defaults()
+          .copyWith(participantAName: '  ', participantBName: '')
+          .toSessionConfig();
+
+      _expectEquals(config.participantA.name, '');
+      _expectEquals(config.participantB.name, '');
     },
     'custom per participant totals can build an A 3 minute B 7 minute config':
         () {

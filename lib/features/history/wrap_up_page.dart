@@ -25,7 +25,9 @@ final class WrapUpPage extends StatefulWidget {
 
 final class _WrapUpPageState extends State<WrapUpPage> {
   late final TextEditingController _summaryController;
-  late final TextEditingController _tagsController;
+  late final TextEditingController _tagInputController;
+  late List<String> _selectedTags;
+  List<String> _recentTags = const [];
   ConversationOutcome _outcome = ConversationOutcome.resolved;
   String? _statusMessage;
   bool _isBusy = false;
@@ -36,15 +38,39 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     _summaryController = TextEditingController(
       text: widget.draftRecord.summaryText,
     );
-    _tagsController = TextEditingController(text: widget.draftRecord.tagsText);
+    _tagInputController = TextEditingController();
+    _selectedTags = _tagsFromText(widget.draftRecord.tagsText);
     _outcome = widget.draftRecord.outcome ?? ConversationOutcome.resolved;
+    _loadRecentTags();
   }
 
   @override
   void dispose() {
     _summaryController.dispose();
-    _tagsController.dispose();
+    _tagInputController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadRecentTags() async {
+    final records = await widget.recordStore.load();
+    if (!mounted) {
+      return;
+    }
+    final tags = <String>[];
+    final seen = <String>{};
+    for (final record in records) {
+      if (record.id == widget.draftRecord.id) {
+        continue;
+      }
+      for (final tag in _tagsFromText(record.tagsText)) {
+        if (seen.add(tag)) {
+          tags.add(tag);
+        }
+      }
+    }
+    setState(() {
+      _recentTags = tags;
+    });
   }
 
   Future<void> _saveRecord() async {
@@ -54,7 +80,7 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     });
     final record = widget.draftRecord.withWrapUpDetails(
       summaryText: _summaryController.text,
-      tagsText: _tagsController.text,
+      tagsText: _tagsTextForSave(),
       outcome: _outcome,
     );
     await widget.recordStore.save(record);
@@ -88,6 +114,35 @@ final class _WrapUpPageState extends State<WrapUpPage> {
     );
   }
 
+  void _handleTagInputChanged(String value) {
+    if (!_hasWhitespace(value)) {
+      return;
+    }
+    _addTags(_tagsFromText(value));
+    _tagInputController.clear();
+  }
+
+  void _addTags(Iterable<String> tags) {
+    final next = _mergeTags([..._selectedTags, ...tags]);
+    setState(() {
+      _selectedTags = next;
+    });
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _selectedTags = _selectedTags.where((item) => item != tag).toList();
+    });
+  }
+
+  String? _tagsTextForSave() {
+    final tags = _mergeTags([
+      ..._selectedTags,
+      ..._tagsFromText(_tagInputController.text),
+    ]);
+    return tags.isEmpty ? null : tags.join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final record = widget.draftRecord;
@@ -98,16 +153,16 @@ final class _WrapUpPageState extends State<WrapUpPage> {
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
           children: [
             const Text(
-              '대화가 끝났어요',
+              '대화를 마쳤어요.',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             const Text(
-              '오늘의 대화를 정리해요',
+              '오늘 나눈 마음을 정리해요.',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
-            const Text('승패가 아니라, 다음 대화를 위한 기록입니다.'),
+            const Text('모든 대화는 관계가 나아지는 연습이 될 수 있어요.'),
             const SizedBox(height: 18),
             _SummaryCard(record: record),
             const SizedBox(height: 14),
@@ -120,7 +175,12 @@ final class _WrapUpPageState extends State<WrapUpPage> {
             const SizedBox(height: 12),
             _NotesSection(
               summaryController: _summaryController,
-              tagsController: _tagsController,
+              tagInputController: _tagInputController,
+              selectedTags: _selectedTags,
+              recentTags: _recentTags,
+              onTagInputChanged: _handleTagInputChanged,
+              onAddTag: (tag) => _addTags([tag]),
+              onRemoveTag: _removeTag,
               outcome: _outcome,
               onOutcomeChanged: (outcome) {
                 setState(() {
@@ -176,15 +236,9 @@ final class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 12),
           _MetricGrid(
             metrics: [
-              _MetricData('종료', record.endReason.label),
               _MetricData('대화 시간', formatSeconds(record.durationSeconds)),
               _MetricData('휴식', record.breakCount.toString()),
               _MetricData('휴식 시간', formatSeconds(record.totalBreakSeconds)),
-              _MetricData(
-                '턴 제한',
-                formatSeconds(record.config.turnLimitSeconds),
-              ),
-              _MetricData('알림', record.config.alertChannels),
             ],
           ),
         ],
@@ -205,7 +259,7 @@ final class _ParticipantResultCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            participant.name,
+            participant.displayName,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
@@ -214,15 +268,6 @@ final class _ParticipantResultCard extends StatelessWidget {
               _MetricData(
                 '사용한 시간',
                 formatSeconds(participant.totalUsedSeconds),
-              ),
-              _MetricData(
-                '남은 시간',
-                formatSeconds(participant.totalRemainingSeconds),
-              ),
-              _MetricData('차례 수', participant.turnCount.toString()),
-              _MetricData(
-                '오버타임 합계',
-                formatSeconds(participant.overtimeTotalSeconds),
               ),
             ],
           ),
@@ -234,13 +279,23 @@ final class _ParticipantResultCard extends StatelessWidget {
 
 final class _NotesSection extends StatelessWidget {
   final TextEditingController summaryController;
-  final TextEditingController tagsController;
+  final TextEditingController tagInputController;
+  final List<String> selectedTags;
+  final List<String> recentTags;
+  final ValueChanged<String> onTagInputChanged;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
   final ConversationOutcome outcome;
   final ValueChanged<ConversationOutcome> onOutcomeChanged;
 
   const _NotesSection({
     required this.summaryController,
-    required this.tagsController,
+    required this.tagInputController,
+    required this.selectedTags,
+    required this.recentTags,
+    required this.onTagInputChanged,
+    required this.onAddTag,
+    required this.onRemoveTag,
     required this.outcome,
     required this.onOutcomeChanged,
   });
@@ -266,16 +321,119 @@ final class _NotesSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const _FieldLabel('해시태그'),
+          if (recentTags.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: recentTags
+                  .map((tag) {
+                    return _TagSuggestionChip(
+                      tag: tag,
+                      onTap: () => onAddTag(tag),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (selectedTags.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: selectedTags
+                  .map((tag) {
+                    return _SelectedTagChip(
+                      tag: tag,
+                      onRemove: () => onRemoveTag(tag),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+            const SizedBox(height: 8),
+          ],
           CupertinoTextField(
             key: const ValueKey('tags-text-field'),
-            controller: tagsController,
+            controller: tagInputController,
+            onChanged: onTagInputChanged,
             minLines: 1,
-            maxLines: 2,
-            placeholder: '#감정 #생활비',
+            maxLines: 1,
+            placeholder: '감정 생활비',
+            textInputAction: TextInputAction.done,
           ),
           const SizedBox(height: 12),
           _OutcomeSelector(outcome: outcome, onChanged: onOutcomeChanged),
         ],
+      ),
+    );
+  }
+}
+
+final class _TagSuggestionChip extends StatelessWidget {
+  final String tag;
+  final VoidCallback onTap;
+
+  const _TagSuggestionChip({required this.tag, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      key: ValueKey('recent-tag-$tag'),
+      minimumSize: Size.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      color: const Color(0xFFE7F1EC),
+      borderRadius: BorderRadius.circular(8),
+      onPressed: onTap,
+      child: Text(
+        tag,
+        style: const TextStyle(
+          color: Color(0xFF244F4B),
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+final class _SelectedTagChip extends StatelessWidget {
+  final String tag;
+  final VoidCallback onRemove;
+
+  const _SelectedTagChip({required this.tag, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: ValueKey('selected-tag-$tag'),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 7, 7, 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              tag,
+              style: const TextStyle(
+                color: CupertinoColors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 5),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onRemove,
+              child: const Icon(
+                CupertinoIcons.xmark_circle_fill,
+                color: CupertinoColors.white,
+                size: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -318,6 +476,42 @@ final class _OutcomeSelector extends StatelessWidget {
           .toList(growable: false),
     );
   }
+}
+
+List<String> _tagsFromText(String? text) {
+  if (text == null) {
+    return const [];
+  }
+  final tags = text
+      .split(RegExp(r'\s+'))
+      .map(_normalizeTag)
+      .whereType<String>()
+      .toList(growable: false);
+  return _mergeTags(tags);
+}
+
+List<String> _mergeTags(Iterable<String> tags) {
+  final merged = <String>[];
+  final seen = <String>{};
+  for (final tag in tags) {
+    final normalized = _normalizeTag(tag);
+    if (normalized != null && seen.add(normalized)) {
+      merged.add(normalized);
+    }
+  }
+  return merged;
+}
+
+String? _normalizeTag(String value) {
+  final trimmed = value.trim().replaceAll(RegExp(r'^#+'), '');
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return '#$trimmed';
+}
+
+bool _hasWhitespace(String value) {
+  return RegExp(r'\s').hasMatch(value);
 }
 
 final class _Card extends StatelessWidget {

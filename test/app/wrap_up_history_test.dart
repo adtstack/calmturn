@@ -1,6 +1,7 @@
 import 'package:calmturn/features/history/session_record.dart';
 import 'package:calmturn/features/history/session_record_store.dart';
 import 'package:calmturn/features/history/history_screen.dart';
+import 'package:calmturn/features/history/wrap_up_page.dart';
 import 'package:calmturn/features/settings/app_settings.dart';
 import 'package:calmturn/features/timer/domain/timer_engine.dart';
 import 'package:calmturn/features/timer/domain/timer_models.dart';
@@ -25,7 +26,11 @@ void main() {
     await tester.pump(const Duration(seconds: 42));
     await _finishThroughDialog(tester);
 
-    expect(find.text('대화가 끝났어요'), findsOneWidget);
+    expect(find.text('대화를 마쳤어요.'), findsOneWidget);
+    expect(find.text('오늘 나눈 마음을 정리해요.'), findsOneWidget);
+    expect(find.text('모든 대화는 관계가 나아지는 연습이 될 수 있어요.'), findsOneWidget);
+    expect(find.text('흰칸'), findsOneWidget);
+    expect(find.text('검은칸'), findsOneWidget);
     await _ensureTextVisible(tester, '잘 마무리됨');
     expect(find.text('잘 마무리됨'), findsOneWidget);
     expect(find.text('아직 남음'), findsOneWidget);
@@ -46,6 +51,8 @@ void main() {
     expect(records.single.summaryText, '서로 말이 겹치는 구간을 줄였다.');
     expect(records.single.tagsText, '#말끊김 #예산');
     expect(records.single.outcome, ConversationOutcome.unresolved);
+    expect(records.single.participantResults.first.name, '');
+    expect(records.single.participantResults.last.name, '');
     expect(find.text('시계'), findsOneWidget);
     expect(find.byKey(const ValueKey('clock-left-zone')), findsNothing);
 
@@ -66,6 +73,13 @@ void main() {
     expect(find.text('기록 자세히'), findsOneWidget);
     expect(find.text('#말끊김 #예산'), findsOneWidget);
     expect(find.text('아직 남음'), findsOneWidget);
+    await _ensureTextVisible(tester, '흰칸');
+    expect(find.text('검은칸'), findsOneWidget);
+    await _ensureTextVisible(tester, '사용한 시간');
+    expect(find.text('오버타임 합계'), findsNothing);
+    expect(find.text('배정 시간'), findsNothing);
+    expect(find.text('남은 시간'), findsNothing);
+    expect(find.text('차례 수'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -119,6 +133,75 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('wrap-up keeps records simple and commits tags from words', (
+    tester,
+  ) async {
+    final store = JsonSessionRecordStore(
+      storage: InMemorySessionRecordStorage(),
+    );
+    await store.save(
+      _record(
+        'previous',
+        DateTime(2026, 6, 6, 8),
+        ConversationOutcome.resolved,
+        tagsText: '#예산 #말끊김',
+      ),
+    );
+    var startedAnotherSession = false;
+
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: WrapUpPage(
+          draftRecord: _record(
+            'draft',
+            DateTime(2026, 6, 6, 9),
+            ConversationOutcome.resolved,
+            tagsText: null,
+          ),
+          recordStore: store,
+          onStartAnotherSession: () {
+            startedAnotherSession = true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('종료'), findsNothing);
+    expect(find.text('알림'), findsNothing);
+    expect(find.text('오버타임 합계'), findsNothing);
+    expect(find.text('배정 시간'), findsNothing);
+    expect(find.text('남은 시간'), findsNothing);
+    expect(find.text('차례 수'), findsNothing);
+    expect(find.text('사용한 시간'), findsNWidgets(2));
+
+    final previousTag = find.byKey(const ValueKey('recent-tag-#예산'));
+    await _ensureFinderVisible(tester, previousTag);
+    await tester.tap(previousTag);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('selected-tag-#예산')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('tags-text-field')),
+      '감정 ',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('selected-tag-#감정')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('tags-text-field')),
+      '생활비',
+    );
+    await _tapText(tester, '기록 저장');
+
+    final records = await store.load();
+    final savedDraft = records.singleWhere((record) => record.id == 'draft');
+    expect(savedDraft.tagsText, '#예산 #감정 #생활비');
+    expect(startedAnotherSession, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('finish without saving removes an auto-saved draft record', (
     tester,
   ) async {
@@ -164,14 +247,18 @@ Future<void> _pumpApp(
 
 Future<void> _ensureTextVisible(WidgetTester tester, String text) async {
   final textFinder = find.text(text);
-  if (textFinder.evaluate().isEmpty) {
+  await _ensureFinderVisible(tester, textFinder);
+}
+
+Future<void> _ensureFinderVisible(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
     await tester.scrollUntilVisible(
-      textFinder,
+      finder,
       220,
       scrollable: find.byType(Scrollable).first,
     );
   }
-  await tester.ensureVisible(textFinder.last);
+  await tester.ensureVisible(finder.last);
   await tester.pumpAndSettle();
 }
 
@@ -249,8 +336,9 @@ SessionConfig _config() {
 SessionRecord _record(
   String id,
   DateTime startedAt,
-  ConversationOutcome outcome,
-) {
+  ConversationOutcome outcome, {
+  String? tagsText = '#test',
+}) {
   final config = _config();
   return SessionRecord.fromTimerSnapshot(
     id: id,
@@ -261,7 +349,7 @@ SessionRecord _record(
     endReason: SessionEndReason.endedByUser,
     breakCount: 0,
     summaryText: '기록 $id',
-    tagsText: '#test',
+    tagsText: tagsText,
     outcome: outcome,
   );
 }

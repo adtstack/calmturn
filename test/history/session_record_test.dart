@@ -88,6 +88,58 @@ void main() {
       _expect(participantB.penaltyCount == 0, 'participant B marks mismatch');
     },
 
+    'blank participant names are preserved but titled by clock color': () {
+      final config = _config(participantAName: '', participantBName: '');
+      final record = SessionRecord.fromTimerSnapshot(
+        id: 'blank-names',
+        config: config,
+        snapshot: TimerEngine.start(config).snapshot(),
+        startedAt: DateTime.utc(2026, 5, 15, 9),
+        endedAt: DateTime.utc(2026, 5, 15, 9, 5),
+        endReason: SessionEndReason.endedByUser,
+        breakCount: 0,
+      );
+
+      _expect(record.title == '흰칸 / 검은칸', 'blank title should use zones');
+      _expect(
+        record.participantResults.first.name == '',
+        'blank participant A name should persist',
+      );
+      _expect(
+        record.participantResults.last.name == '',
+        'blank participant B name should persist',
+      );
+    },
+
+    'legacy speaker fallbacks are displayed by clock color': () {
+      final config = _config(
+        participantAName: '말하는 사람 A',
+        participantBName: '말하는 사람 B',
+      );
+      final record = SessionRecord.fromTimerSnapshot(
+        id: 'legacy-fallback-names',
+        config: config,
+        snapshot: TimerEngine.start(config).snapshot(),
+        startedAt: DateTime.utc(2026, 5, 15, 9),
+        endedAt: DateTime.utc(2026, 5, 15, 9, 5),
+        endReason: SessionEndReason.endedByUser,
+        breakCount: 0,
+      );
+
+      _expect(
+        record.title == '흰칸 / 검은칸',
+        'legacy fallback title should use zones',
+      );
+      _expect(
+        record.participantResults.first.name == '말하는 사람 A',
+        'legacy participant A name should persist',
+      );
+      _expect(
+        record.participantResults.last.name == '말하는 사람 B',
+        'legacy participant B name should persist',
+      );
+    },
+
     'session record round trips through json': () {
       final config = _config();
       final record = SessionRecord.fromTimerSnapshot(
@@ -186,16 +238,19 @@ void main() {
   }
 }
 
-SessionConfig _config() {
+SessionConfig _config({
+  String participantAName = 'A',
+  String participantBName = 'B',
+}) {
   return SessionConfig(
-    participantA: const ParticipantConfig(
+    participantA: ParticipantConfig(
       id: 'a',
-      name: 'A',
+      name: participantAName,
       totalAllocatedSeconds: 300,
     ),
-    participantB: const ParticipantConfig(
+    participantB: ParticipantConfig(
       id: 'b',
-      name: 'B',
+      name: participantBName,
       totalAllocatedSeconds: 300,
     ),
     turnLimitSeconds: 60,

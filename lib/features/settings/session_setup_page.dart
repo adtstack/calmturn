@@ -92,7 +92,6 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                 _FieldLabel('왼쪽'),
                 CupertinoTextField(
                   controller: _participantAController,
-                  placeholder: '남편',
                   textInputAction: TextInputAction.next,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(participantAName: value));
@@ -102,7 +101,6 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                 _FieldLabel('오른쪽'),
                 CupertinoTextField(
                   controller: _participantBController,
-                  placeholder: '와이프',
                   textInputAction: TextInputAction.done,
                   onChanged: (value) {
                     _updateDraft(_draft.copyWith(participantBName: value));
@@ -156,11 +154,11 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
                   value: _draft.firstSpeakerId,
                   options: [
                     ChoiceOption(
-                      _nameOrFallback(_draft.participantAName, '남편'),
+                      _nameOrFallback(_draft.participantAName, '흰칸'),
                       SessionSettingsDraft.participantAId,
                     ),
                     ChoiceOption(
-                      _nameOrFallback(_draft.participantBName, '와이프'),
+                      _nameOrFallback(_draft.participantBName, '검은칸'),
                       SessionSettingsDraft.participantBId,
                     ),
                   ],

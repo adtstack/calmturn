@@ -31,6 +31,27 @@ enum ConversationOutcome {
   }
 }
 
+const whiteClockParticipantLabel = '흰칸';
+const blackClockParticipantLabel = '검은칸';
+
+String participantDisplayName({required String id, required String name}) {
+  final trimmed = name.trim();
+  if (trimmed == '말하는 사람 A') {
+    return whiteClockParticipantLabel;
+  }
+  if (trimmed == '말하는 사람 B') {
+    return blackClockParticipantLabel;
+  }
+  if (trimmed.isNotEmpty) {
+    return trimmed;
+  }
+  return switch (id) {
+    'a' => whiteClockParticipantLabel,
+    'b' => blackClockParticipantLabel,
+    _ => '',
+  };
+}
+
 final class SessionConfigSnapshot {
   final int turnLimitSeconds;
   final bool overtimeEnabled;
@@ -111,6 +132,10 @@ final class ParticipantResult {
     required this.overtimeTotalSeconds,
     required this.penaltyCount,
   });
+
+  String get displayName {
+    return participantDisplayName(id: id, name: name);
+  }
 
   factory ParticipantResult.fromParticipant(Participant participant) {
     return ParticipantResult(
@@ -243,7 +268,7 @@ final class SessionRecord {
 
   String get title {
     return participantResults
-        .map((participant) => participant.name)
+        .map((participant) => participant.displayName)
         .join(' / ');
   }
 

@@ -14,8 +14,10 @@ void main() {
     await tester.pump();
 
     expect(find.text('시계'), findsOneWidget);
-    expect(_textFieldValue(tester, 0), '남편');
-    expect(_textFieldValue(tester, 1), '와이프');
+    expect(_textFieldValue(tester, 0), '');
+    expect(_textFieldValue(tester, 1), '');
+    expect(find.text('흰칸'), findsOneWidget);
+    expect(find.text('검은칸'), findsOneWidget);
     expect(find.text('10분'), findsOneWidget);
     expect(find.text('20분'), findsOneWidget);
     expect(find.text('30분'), findsOneWidget);
@@ -51,7 +53,7 @@ void main() {
 
     expect(find.text('두 사람이 같은 규칙을 보고 시작해요'), findsNothing);
     expect(find.byKey(const ValueKey('clock-left-zone')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('남편.*말하는 중')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('흰칸.*말하는 중')), findsOneWidget);
     expect(find.text('20:00'), findsWidgets);
     expect(find.text('5:00'), findsOneWidget);
 

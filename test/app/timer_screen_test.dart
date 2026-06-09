@@ -23,10 +23,6 @@ void main() {
     expect(find.text('차례 넘기기'), findsNothing);
     expect(find.text('일시정지'), findsNothing);
     expect(find.text('종료'), findsNothing);
-    expect(find.byKey(const ValueKey('pause-session-button')), findsNothing);
-    expect(find.byKey(const ValueKey('finish-session-button')), findsNothing);
-
-    await _showControls(tester);
     expect(find.byKey(const ValueKey('pause-session-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('finish-session-button')), findsOneWidget);
 
@@ -361,7 +357,6 @@ void main() {
   ) async {
     await _pumpTimer(tester, _config());
 
-    await _showControls(tester);
     await tester.tap(find.byKey(const ValueKey('pause-session-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('resume-session-button')), findsOneWidget);
@@ -378,7 +373,7 @@ void main() {
     expect(find.text('종료할까요?'), findsNothing);
 
     await _finishThroughDialog(tester);
-    expect(find.text('대화가 끝났어요'), findsOneWidget);
+    expect(find.text('대화를 마쳤어요.'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -419,29 +414,10 @@ Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
 }
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
-  await _showControls(tester);
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
   await tester.pumpAndSettle();
   expect(find.text('종료할까요?'), findsOneWidget);
   await _tapText(tester, '종료');
-}
-
-Future<void> _showControls(WidgetTester tester) async {
-  final controlsAreVisible =
-      find
-          .byKey(const ValueKey('pause-session-button'))
-          .evaluate()
-          .isNotEmpty ||
-      find
-          .byKey(const ValueKey('resume-session-button'))
-          .evaluate()
-          .isNotEmpty ||
-      find.byKey(const ValueKey('finish-session-button')).evaluate().isNotEmpty;
-  if (controlsAreVisible) {
-    return;
-  }
-  await tester.tap(find.byKey(const ValueKey('clock-controls-reveal-zone')));
-  await tester.pump();
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {

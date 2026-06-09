@@ -19,8 +19,6 @@ import 'features/timer/timer_display_controller.dart';
 import 'features/timer/timer_feedback.dart';
 
 const _clockBoundaryAnimationDuration = Duration(milliseconds: 700);
-const _clockControlsRevealSize = 92.0;
-const _clockControlsHideDelay = Duration(seconds: 4);
 
 void main() {
   platform_storage.configurePlatformAppSettingsStorage();
@@ -216,8 +214,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   int _totalBreakSeconds = 0;
   DateTime? _breakStartedAt;
   bool _timerDisplayActive = false;
-  bool _controlsVisible = false;
-  Timer? _controlsHideTimer;
   int _turnVisualTotalSeconds = 1;
   int _turnVisualVersion = 0;
 
@@ -260,7 +256,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   @override
   void dispose() {
     _stopTicker();
-    _controlsHideTimer?.cancel();
     _restoreTimerDisplay();
     super.dispose();
   }
@@ -296,9 +291,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     _breakCount = 0;
     _totalBreakSeconds = 0;
     _breakStartedAt = null;
-    _controlsHideTimer?.cancel();
-    _controlsHideTimer = null;
-    _controlsVisible = false;
     _resetTurnVisualProgress();
   }
 
@@ -353,7 +345,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       _finishActiveBreak(DateTime.now());
       _commit(_engine.resume());
       _startTicker();
-      _scheduleControlsHide();
       return;
     }
 
@@ -363,7 +354,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       _breakStartedAt = DateTime.now();
     }
     _commit(events);
-    _controlsHideTimer?.cancel();
     _stopTicker();
   }
 
@@ -433,7 +423,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       } catch (_) {}
     }
     _stopTicker();
-    _controlsHideTimer?.cancel();
     _restoreTimerDisplay();
     if (!mounted) {
       return;
@@ -460,29 +449,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       return;
     }
     _reset();
-  }
-
-  void _showControlsTemporarily() {
-    _controlsHideTimer?.cancel();
-    setState(() {
-      _controlsVisible = true;
-    });
-    _scheduleControlsHide();
-  }
-
-  void _scheduleControlsHide() {
-    _controlsHideTimer?.cancel();
-    if (_snapshot.phase == TimerPhase.paused && _engine.canResume) {
-      return;
-    }
-    _controlsHideTimer = Timer(_clockControlsHideDelay, () {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _controlsVisible = false;
-      });
-    });
   }
 
   void _finishActiveBreak(DateTime endedAt) {
@@ -533,32 +499,15 @@ final class _TimerHomePageState extends State<TimerHomePage> {
             onPassTurn: canPass ? _passTurn : null,
           ),
           Positioned(
-            top: 0,
-            right: 0,
-            width: _clockControlsRevealSize,
-            height: _clockControlsRevealSize,
-            child: Semantics(
-              button: true,
-              label: '조작 버튼 표시',
-              child: GestureDetector(
-                key: const ValueKey('clock-controls-reveal-zone'),
-                behavior: HitTestBehavior.opaque,
-                onTap: _showControlsTemporarily,
-                child: const SizedBox.expand(),
-              ),
+            top: 14,
+            right: 14,
+            child: _ClockControls(
+              phase: snapshot.phase,
+              canResume: canResume,
+              onPauseOrResume: _takeBreakOrResume,
+              onFinish: _confirmFinish,
             ),
           ),
-          if (_controlsVisible)
-            Positioned(
-              top: 14,
-              right: 14,
-              child: _ClockControls(
-                phase: snapshot.phase,
-                canResume: canResume,
-                onPauseOrResume: _takeBreakOrResume,
-                onFinish: _confirmFinish,
-              ),
-            ),
           if (_feedbackCues.isNotEmpty)
             Positioned(
               left: 18,
@@ -1030,7 +979,7 @@ String _clockSemanticsLabel({
   required bool canResume,
 }) {
   final parts = <String>[
-    participant.name,
+    participantDisplayName(id: participant.id, name: participant.name),
     isActive ? '말하는 중' : '듣는 중',
     '전체 남은 시간 ${formatSeconds(participant.totalRemainingSeconds)}',
   ];

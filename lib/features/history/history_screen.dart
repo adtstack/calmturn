@@ -454,28 +454,15 @@ final class _ParticipantDetailCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            participant.name,
+            participant.displayName,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 12),
           _MetricGrid(
             metrics: [
               _MetricData(
-                '배정 시간',
-                formatSeconds(participant.totalAllocatedSeconds),
-              ),
-              _MetricData(
                 '사용한 시간',
                 formatSeconds(participant.totalUsedSeconds),
-              ),
-              _MetricData(
-                '남은 시간',
-                formatSeconds(participant.totalRemainingSeconds),
-              ),
-              _MetricData('차례 수', participant.turnCount.toString()),
-              _MetricData(
-                '오버타임 합계',
-                formatSeconds(participant.overtimeTotalSeconds),
               ),
             ],
           ),
