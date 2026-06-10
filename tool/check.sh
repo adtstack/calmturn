@@ -8,6 +8,7 @@ export PUB_CACHE="${PUB_CACHE:-.pub-cache}"
 flutter pub get
 flutter analyze
 dart run test/timer/timer_engine_test.dart
+flutter test test/timer/timer_feedback_test.dart
 dart run test/settings/session_settings_test.dart
 dart run test/settings/app_settings_test.dart
 dart run test/history/session_record_test.dart
