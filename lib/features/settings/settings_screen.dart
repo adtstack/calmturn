@@ -66,6 +66,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '전체 시간',
               children: [
+                const _HelpText(
+                  '시작 화면은 같은 시간 프리셋만 보여줘요. 각자 다른 시간이나 직접 입력은 여기서 다음 대화 기본값으로 조정해요.',
+                ),
+                const SizedBox(height: 12),
                 _ChoiceGroup<TotalTimeMode>(
                   value: _draft.totalTimeMode,
                   options: const [
@@ -126,6 +130,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '턴 제한',
               children: [
+                const _HelpText(
+                  '한 번에 말할 수 있는 기본 시간이에요. 이 시간이 지나면 오버타임 규칙이나 차례 종료 규칙이 적용돼요.',
+                ),
+                const SizedBox(height: 12),
                 MinutePresetField(
                   value: _draft.turnLimitSeconds,
                   options: turnLimitMinuteOptions,
@@ -143,6 +151,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '오버타임',
               children: [
+                const _HelpText(
+                  '턴 제한 뒤에도 시간이 이어지면 오버타임으로 기록해요. 끄면 시간이 끝났을 때 차례 종료 상태로 멈춰요.',
+                ),
+                const SizedBox(height: 12),
                 _ToggleRow(
                   label: '오버타임',
                   value: _draft.overtimeEnabled,
@@ -159,10 +171,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   _ChoiceGroup<int>(
                     value: _draft.penaltyThresholdSeconds,
                     options: const [
-                      ChoiceOption('주의 표시 30초', 30),
-                      ChoiceOption('주의 표시 1분', 60),
-                      ChoiceOption('주의 표시 2분', 120),
-                      ChoiceOption('주의 표시 3분', 180),
+                      ChoiceOption('내부 기록 기준 30초', 30),
+                      ChoiceOption('내부 기록 기준 1분', 60),
+                      ChoiceOption('내부 기록 기준 2분', 120),
+                      ChoiceOption('내부 기록 기준 3분', 180),
                     ],
                     onSelected: (value) {
                       _updateDraft(
@@ -172,7 +184,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 12),
                   _ToggleRow(
-                    label: '주의 표시 반복',
+                    label: '내부 기록 반복',
                     value:
                         _draft.penaltyRepeatMode ==
                         PenaltyRepeatMode.everyThreshold,
@@ -192,6 +204,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '알림',
               children: [
+                const _HelpText(
+                  '턴/전체 시간 종료 전, 오버타임 시작, 내부 기준 도달 중 필요한 순간만 알려줘요. 대상과 방식은 각각 하나 이상 켜져 있어야 해요.',
+                ),
+                const SizedBox(height: 12),
                 _ChoiceGroup<int>(
                   value: _draft.warningBeforeSeconds,
                   options: const [
@@ -230,7 +246,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                   _ToggleRow(
-                    label: '주의 표시',
+                    label: '내부 기준 도달',
                     value: _draft.penaltyAlertEnabled,
                     onChanged: (value) {
                       _updateDraft(_draft.copyWith(penaltyAlertEnabled: value));
@@ -273,6 +289,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             _Section(
               title: '기록',
               children: [
+                const _HelpText(
+                  '자동 저장은 대화 종료 기록을 남기는 기본 동작이에요. 내부 기준 기록은 호환성용 데이터이며 실행 화면과 기본 기록 화면에는 보이지 않아요.',
+                ),
+                const SizedBox(height: 12),
                 _ToggleRow(
                   label: '자동 저장',
                   value: _settings.autoSaveRecords,
@@ -433,6 +453,24 @@ final class _ToggleRow extends StatelessWidget {
             CupertinoSwitch(value: value, onChanged: onChanged),
           ],
         ),
+      ),
+    );
+  }
+}
+
+final class _HelpText extends StatelessWidget {
+  final String text;
+
+  const _HelpText(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF5F6964),
+        fontSize: 14,
+        height: 1.35,
       ),
     );
   }

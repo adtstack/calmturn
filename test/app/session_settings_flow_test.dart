@@ -97,7 +97,13 @@ void main() {
 
       expect(find.text('고급설정'), findsWidgets);
       expect(find.text('오버타임'), findsWidgets);
-      expect(find.text('주의 표시 1분'), findsOneWidget);
+      expect(
+        find.text('턴 제한 뒤에도 시간이 이어지면 오버타임으로 기록해요. 끄면 시간이 끝났을 때 차례 종료 상태로 멈춰요.'),
+        findsOneWidget,
+      );
+      expect(find.text('내부 기록 기준 1분'), findsOneWidget);
+      await _ensureTextVisible(tester, '내부 기준 도달');
+      expect(find.text('내부 기준 도달'), findsOneWidget);
     },
   );
 
@@ -156,6 +162,19 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _ensureTextVisible(WidgetTester tester, String text) async {
+  final textFinder = find.text(text);
+  if (textFinder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      textFinder,
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+  }
+  await tester.ensureVisible(textFinder.last);
   await tester.pumpAndSettle();
 }
 

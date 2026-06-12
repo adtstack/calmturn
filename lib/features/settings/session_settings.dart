@@ -4,7 +4,7 @@ enum TotalTimeMode { same, customPerParticipant }
 
 const invalidTurnLimitMessage = '턴 제한은 전체 시간보다 길 수 없어요.';
 const invalidOvertimeWindowMessage = '오버타임을 쓰려면 턴 제한이 전체 시간보다 짧아야 해요.';
-const invalidPenaltyThresholdMessage = '주의 표시 기준은 가능한 오버타임보다 길 수 없어요.';
+const invalidPenaltyThresholdMessage = '내부 기록 기준은 가능한 오버타임보다 길 수 없어요.';
 const invalidWarningBeforeMessage = '알림 시점은 턴 제한과 전체 시간보다 짧아야 해요.';
 const invalidAlertDeliveryMessage = '알림 방식이 모두 꺼져 있어요.';
 const invalidAlertTargetMessage = '알림 대상이 모두 꺼져 있어요.';
