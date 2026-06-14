@@ -10,7 +10,7 @@ void main() {
       _expectEquals(config.participantB.name, '');
       _expectEquals(config.participantA.totalAllocatedSeconds, 600);
       _expectEquals(config.participantB.totalAllocatedSeconds, 600);
-      _expectEquals(config.turnLimitSeconds, 180);
+      _expectEquals(config.turnLimitSeconds, 30);
       _expectEquals(config.firstSpeakerId, 'a');
       _expectEquals(config.penaltyConfig.thresholdSeconds, 60);
       _expectEquals(config.alertConfig.warningBeforeSeconds, 10);
@@ -92,15 +92,12 @@ void main() {
       _expectEquals(config.alertConfig.overtimeStartAlertEnabled, false);
       _expectEquals(config.alertConfig.penaltyAlertEnabled, false);
     },
-    'validates turn limits that are longer than the shortest total': () {
+    'validates turn limits over one minute': () {
       final message = validateSessionSettingsDraft(
-        SessionSettingsDraft.defaults().copyWith(
-          sharedTotalSeconds: 180,
-          turnLimitSeconds: 300,
-        ),
+        SessionSettingsDraft.defaults().copyWith(turnLimitSeconds: 90),
       );
 
-      _expectEquals(message, invalidTurnLimitMessage);
+      _expectEquals(message, invalidTurnLimitRangeMessage);
     },
     'validates penalty thresholds that can never be reached': () {
       final message = validateSessionSettingsDraft(
@@ -116,8 +113,8 @@ void main() {
     'validates overtime settings with no possible overtime window': () {
       final message = validateSessionSettingsDraft(
         SessionSettingsDraft.defaults().copyWith(
-          sharedTotalSeconds: 180,
-          turnLimitSeconds: 180,
+          sharedTotalSeconds: 60,
+          turnLimitSeconds: 60,
         ),
       );
 

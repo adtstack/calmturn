@@ -325,7 +325,7 @@ SessionConfig _config() {
       name: '와이프',
       totalAllocatedSeconds: 600,
     ),
-    turnLimitSeconds: 180,
+    turnLimitSeconds: 30,
     firstSpeakerId: 'a',
     overtimeConfig: OvertimeConfig(),
     penaltyConfig: PenaltyConfig(),

@@ -25,11 +25,11 @@ const participantBTotalMinuteOptions = [
   ChoiceOption('B 60분', 3600),
 ];
 
-const turnLimitMinuteOptions = [
+const turnLimitSecondOptions = [
+  ChoiceOption('10초', 10),
+  ChoiceOption('30초', 30),
+  ChoiceOption('45초', 45),
   ChoiceOption('1분', 60),
-  ChoiceOption('2분', 120),
-  ChoiceOption('3분', 180),
-  ChoiceOption('5분', 300),
 ];
 
 final class SessionSetupPage extends StatefulWidget {
@@ -133,12 +133,12 @@ final class _SessionSetupPageState extends State<SessionSetupPage> {
             _Section(
               title: '턴 제한',
               children: [
-                MinutePresetField(
+                SecondPresetField(
                   value: _draft.turnLimitSeconds,
-                  options: turnLimitMinuteOptions,
-                  inputKey: 'turn-limit-minutes-field',
-                  minMinutes: minTurnLimitMinutes,
-                  maxMinutes: maxTurnLimitMinutes,
+                  options: turnLimitSecondOptions,
+                  inputKey: 'turn-limit-seconds-field',
+                  minSeconds: minTurnLimitSeconds,
+                  maxSeconds: maxTurnLimitSeconds,
                   rangeMessage: invalidTurnLimitRangeMessage,
                   onInvalidInput: _handleInvalidInput,
                   onChanged: (value) {
@@ -260,7 +260,7 @@ final class ChoiceOption<T> {
   const ChoiceOption(this.label, this.value);
 }
 
-final class MinutePresetField extends StatefulWidget {
+final class MinutePresetField extends StatelessWidget {
   final int value;
   final List<ChoiceOption<int>> options;
   final String inputKey;
@@ -283,29 +283,116 @@ final class MinutePresetField extends StatefulWidget {
   });
 
   @override
-  State<MinutePresetField> createState() => _MinutePresetFieldState();
+  Widget build(BuildContext context) {
+    return _NumberPresetField(
+      value: value,
+      valueText: _minutesText(value),
+      options: options,
+      inputKey: inputKey,
+      unitLabel: '분',
+      onPresetSelected: onChanged,
+      onInputChanged: (text) {
+        final minutes = int.tryParse(text);
+        if (minutes == null || text.isEmpty) {
+          return;
+        }
+        if (minutes < minMinutes || minutes > maxMinutes) {
+          onInvalidInput(rangeMessage);
+          return;
+        }
+        onChanged(minutes * 60);
+      },
+    );
+  }
 }
 
-final class _MinutePresetFieldState extends State<MinutePresetField> {
+final class SecondPresetField extends StatelessWidget {
+  final int value;
+  final List<ChoiceOption<int>> options;
+  final String inputKey;
+  final int minSeconds;
+  final int maxSeconds;
+  final String rangeMessage;
+  final ValueChanged<int> onChanged;
+  final ValueChanged<String> onInvalidInput;
+
+  const SecondPresetField({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.inputKey,
+    required this.minSeconds,
+    required this.maxSeconds,
+    required this.rangeMessage,
+    required this.onChanged,
+    required this.onInvalidInput,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _NumberPresetField(
+      value: value,
+      valueText: '$value',
+      options: options,
+      inputKey: inputKey,
+      unitLabel: '초',
+      onPresetSelected: onChanged,
+      onInputChanged: (text) {
+        final seconds = int.tryParse(text);
+        if (seconds == null || text.isEmpty) {
+          return;
+        }
+        if (seconds < minSeconds || seconds > maxSeconds) {
+          onInvalidInput(rangeMessage);
+          return;
+        }
+        onChanged(seconds);
+      },
+    );
+  }
+}
+
+final class _NumberPresetField extends StatefulWidget {
+  final int value;
+  final String valueText;
+  final List<ChoiceOption<int>> options;
+  final String inputKey;
+  final String unitLabel;
+  final ValueChanged<int> onPresetSelected;
+  final ValueChanged<String> onInputChanged;
+
+  const _NumberPresetField({
+    required this.value,
+    required this.valueText,
+    required this.options,
+    required this.inputKey,
+    required this.unitLabel,
+    required this.onPresetSelected,
+    required this.onInputChanged,
+  });
+
+  @override
+  State<_NumberPresetField> createState() => _NumberPresetFieldState();
+}
+
+final class _NumberPresetFieldState extends State<_NumberPresetField> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _minutesText(widget.value));
+    _controller = TextEditingController(text: widget.valueText);
     _focusNode = FocusNode();
     _focusNode.addListener(_handleFocusChanged);
   }
 
   @override
-  void didUpdateWidget(covariant MinutePresetField oldWidget) {
+  void didUpdateWidget(covariant _NumberPresetField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
-      final nextText = _minutesText(widget.value);
-      if (_controller.text != nextText) {
-        _controller.text = nextText;
-      }
+    if (oldWidget.valueText != widget.valueText &&
+        _controller.text != widget.valueText) {
+      _controller.text = widget.valueText;
     }
   }
 
@@ -342,7 +429,7 @@ final class _MinutePresetFieldState extends State<MinutePresetField> {
                 : const Color(0xFFECE7DB),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             onPressed: () {
-              widget.onChanged(option.value);
+              widget.onPresetSelected(option.value);
               _focusNode.unfocus();
             },
             child: Text(
@@ -413,22 +500,13 @@ final class _MinutePresetFieldState extends State<MinutePresetField> {
                           ? CupertinoColors.white
                           : const Color(0xFF2D6A64),
                       onChanged: (value) {
-                        final minutes = int.tryParse(value);
-                        if (minutes == null || value.isEmpty) {
-                          return;
-                        }
-                        if (minutes < widget.minMinutes ||
-                            minutes > widget.maxMinutes) {
-                          widget.onInvalidInput(widget.rangeMessage);
-                          return;
-                        }
-                        widget.onChanged(minutes * 60);
+                        widget.onInputChanged(value);
                       },
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '분',
+                    widget.unitLabel,
                     style: TextStyle(
                       color: customSelected
                           ? CupertinoColors.white

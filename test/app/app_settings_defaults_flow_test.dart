@@ -70,13 +70,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('advanced-settings-button')));
     await tester.pumpAndSettle();
     await _tapText(tester, '30분');
-    await _tapText(tester, '5분');
+    await _tapText(tester, '1분');
     await _tapText(tester, '시계로');
 
     await _tapText(tester, '시작');
 
     expect(find.text('30:00'), findsWidgets);
-    expect(find.text('5:00'), findsOneWidget);
+    expect(find.text('1:00'), findsOneWidget);
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -173,7 +173,7 @@ SessionConfig _config() {
       name: 'B',
       totalAllocatedSeconds: 1800,
     ),
-    turnLimitSeconds: 300,
+    turnLimitSeconds: 60,
     firstSpeakerId: 'b',
     overtimeConfig: OvertimeConfig(),
     penaltyConfig: PenaltyConfig(),

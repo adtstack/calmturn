@@ -90,9 +90,9 @@ Future<void> main() async {
           final storage = InMemoryAppSettingsStorage();
           await storage.write(
             _settingsJson(
-              turnLimitSeconds: 300,
-              participantATotalSeconds: 180,
-              participantBTotalSeconds: 180,
+              turnLimitSeconds: 60,
+              participantATotalSeconds: 60,
+              participantBTotalSeconds: 60,
             ),
           );
           final store = JsonAppSettingsStore(storage: storage);

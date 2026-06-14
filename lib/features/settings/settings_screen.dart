@@ -134,12 +134,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   '한 번에 말할 수 있는 기본 시간이에요. 이 시간이 지나면 오버타임 규칙이나 차례 종료 규칙이 적용돼요.',
                 ),
                 const SizedBox(height: 12),
-                MinutePresetField(
+                SecondPresetField(
                   value: _draft.turnLimitSeconds,
-                  options: turnLimitMinuteOptions,
-                  inputKey: 'turn-limit-minutes-field',
-                  minMinutes: minTurnLimitMinutes,
-                  maxMinutes: maxTurnLimitMinutes,
+                  options: turnLimitSecondOptions,
+                  inputKey: 'turn-limit-seconds-field',
+                  minSeconds: minTurnLimitSeconds,
+                  maxSeconds: maxTurnLimitSeconds,
                   rangeMessage: invalidTurnLimitRangeMessage,
                   onInvalidInput: _handleInvalidInput,
                   onChanged: (value) {

@@ -9,13 +9,13 @@ const invalidWarningBeforeMessage = '알림 시점은 턴 제한과 전체 시�
 const invalidAlertDeliveryMessage = '알림 방식이 모두 꺼져 있어요.';
 const invalidAlertTargetMessage = '알림 대상이 모두 꺼져 있어요.';
 const invalidTotalTimeRangeMessage = '전체 시간은 1분부터 240분까지 입력할 수 있어요.';
-const invalidTurnLimitRangeMessage = '턴 제한은 1분부터 60분까지 입력할 수 있어요.';
+const invalidTurnLimitRangeMessage = '턴 제한은 1초부터 1분까지 입력할 수 있어요.';
 const invalidSessionConfigMessage = '저장된 설정을 다시 확인해야 해요.';
 
 const minTotalMinutes = 1;
 const maxTotalMinutes = 240;
-const minTurnLimitMinutes = 1;
-const maxTurnLimitMinutes = 60;
+const minTurnLimitSeconds = 1;
+const maxTurnLimitSeconds = 60;
 
 final class SessionSettingsDraft {
   static const participantAId = 'a';
@@ -88,7 +88,7 @@ final class SessionSettingsDraft {
       sharedTotalSeconds: 600,
       participantATotalSeconds: 600,
       participantBTotalSeconds: 600,
-      turnLimitSeconds: 180,
+      turnLimitSeconds: 30,
       firstSpeakerId: participantAId,
       overtimeEnabled: true,
       showOvertime: true,
@@ -495,9 +495,7 @@ String? _validateTotalSeconds(int seconds) {
 }
 
 String? _validateTurnLimitSeconds(int seconds) {
-  if (seconds < minTurnLimitMinutes * 60 ||
-      seconds > maxTurnLimitMinutes * 60 ||
-      seconds % 60 != 0) {
+  if (seconds < minTurnLimitSeconds || seconds > maxTurnLimitSeconds) {
     return invalidTurnLimitRangeMessage;
   }
   return null;

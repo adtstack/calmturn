@@ -22,10 +22,10 @@ void main() {
     expect(find.text('20분'), findsOneWidget);
     expect(find.text('30분'), findsOneWidget);
     expect(find.text('60분'), findsOneWidget);
+    expect(find.text('10초'), findsOneWidget);
+    expect(find.text('30초'), findsOneWidget);
+    expect(find.text('45초'), findsOneWidget);
     expect(find.text('1분'), findsOneWidget);
-    expect(find.text('2분'), findsOneWidget);
-    expect(find.text('3분'), findsOneWidget);
-    expect(find.text('5분'), findsOneWidget);
     expect(find.text('각자 다르게'), findsNothing);
     expect(find.text('A 10분'), findsNothing);
     expect(find.byKey(const ValueKey('history-button')), findsOneWidget);
@@ -48,14 +48,14 @@ void main() {
     await tester.pump();
 
     await _tapText(tester, '20분');
-    await _tapText(tester, '5분');
+    await _tapText(tester, '1분');
     await _tapText(tester, '시작');
 
     expect(find.text('두 사람이 같은 규칙을 보고 시작해요'), findsNothing);
     expect(find.byKey(const ValueKey('clock-left-zone')), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('흰칸.*말하는 중')), findsOneWidget);
     expect(find.text('20:00'), findsWidgets);
-    expect(find.text('5:00'), findsOneWidget);
+    expect(find.text('1:00'), findsOneWidget);
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
