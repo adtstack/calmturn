@@ -88,4 +88,27 @@ void main() {
       contains('검증: `flutter test test/release_identity_test.dart`'),
     );
   });
+
+  test('v4 docs describe the same turn-limit defaults and presets', () {
+    final docs = <String, String>{
+      'README.md': File('README.md').readAsStringSync(),
+      'docs/09_vibe_coding_prompts.md': File(
+        'docs/09_vibe_coding_prompts.md',
+      ).readAsStringSync(),
+      'docs/12_settings_and_notifications.md': File(
+        'docs/12_settings_and_notifications.md',
+      ).readAsStringSync(),
+    };
+
+    for (final entry in docs.entries) {
+      expect(entry.value, contains('턴 제한 기본값은 `30초`'), reason: entry.key);
+      expect(
+        entry.value,
+        contains('턴 제한 프리셋은 `10초 / 30초 / 45초 / 1분`'),
+        reason: entry.key,
+      );
+      expect(entry.value, isNot(contains('턴당 발언 제한시간 기본값은 `3분`')));
+      expect(entry.value, isNot(contains('턴 프리셋은 1/3/5/10분')));
+    }
+  });
 }

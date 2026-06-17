@@ -20,7 +20,7 @@
 
 - [ ] **Step 1: Update setup tests**
 
-Require shared total labels `10분`, `20분`, `30분`, `60분`, turn labels `1분`, `2분`, `3분`, `5분`, no separate participant total controls, and visible setup entry-point keys for history and advanced settings.
+Require shared total labels `10분`, `20분`, `30분`, `60분`, turn labels `10초`, `30초`, `45초`, `1분`, no separate participant total controls, and visible setup entry-point keys for history and advanced settings.
 
 - [ ] **Step 2: Update timer tests**
 
@@ -72,7 +72,7 @@ Change panel sizing so positive remaining time maps to proportional width and ze
 
 - [ ] **Step 1: Simplify setup presets**
 
-Use fair shared total presets `10분`, `20분`, `30분`, `60분`, direct minute input, and turn presets `1분`, `2분`, `3분`, `5분`, direct minute input.
+Use fair shared total presets `10분`, `20분`, `30분`, `60분`, direct minute input, and turn presets `10초`, `30초`, `45초`, `1분`, direct second input.
 
 - [ ] **Step 2: Keep setup entry points visible**
 
