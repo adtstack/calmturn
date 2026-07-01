@@ -195,7 +195,11 @@ final class SessionSettingsDraft {
       ),
       alertConfig: AlertConfig(
         warningBeforeSeconds: warningBeforeSeconds,
-        turnWarningEnabled: turnWarningEnabled,
+        turnWarningEnabled: _effectiveTurnWarningEnabled(
+          turnWarningEnabled: turnWarningEnabled,
+          warningBeforeSeconds: warningBeforeSeconds,
+          turnLimitSeconds: turnLimitSeconds,
+        ),
         totalWarningEnabled: totalWarningEnabled,
         overtimeStartAlertEnabled: effectiveOvertimeStartAlertEnabled,
         penaltyAlertEnabled: effectivePenaltyAlertEnabled,
@@ -427,8 +431,13 @@ String? _validateSessionSettings({
     return invalidOvertimeWindowMessage;
   }
 
-  if ((turnWarningEnabled && warningBeforeSeconds >= turnLimitSeconds) ||
-      (totalWarningEnabled && warningBeforeSeconds >= shortestTotal)) {
+  final effectiveTurnWarningEnabled = _effectiveTurnWarningEnabled(
+    turnWarningEnabled: turnWarningEnabled,
+    warningBeforeSeconds: warningBeforeSeconds,
+    turnLimitSeconds: turnLimitSeconds,
+  );
+
+  if (totalWarningEnabled && warningBeforeSeconds >= shortestTotal) {
     return invalidWarningBeforeMessage;
   }
 
@@ -444,7 +453,7 @@ String? _validateSessionSettings({
   final activeAlertTargetCount = _activeAlertTargetCount(
     overtimeEnabled: overtimeEnabled,
     penaltyEnabled: effectivePenaltyEnabled,
-    turnWarningEnabled: turnWarningEnabled,
+    turnWarningEnabled: effectiveTurnWarningEnabled,
     totalWarningEnabled: totalWarningEnabled,
     overtimeStartAlertEnabled: overtimeStartAlertEnabled,
     penaltyAlertEnabled: penaltyAlertEnabled,
@@ -466,6 +475,14 @@ String? _validateSessionSettings({
   }
 
   return null;
+}
+
+bool _effectiveTurnWarningEnabled({
+  required bool turnWarningEnabled,
+  required int warningBeforeSeconds,
+  required int turnLimitSeconds,
+}) {
+  return turnWarningEnabled && warningBeforeSeconds < turnLimitSeconds;
 }
 
 String? _validateSessionIdentities(SessionConfig config) {

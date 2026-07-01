@@ -99,6 +99,28 @@ void main() {
 
       _expectEquals(message, invalidTurnLimitRangeMessage);
     },
+    'accepts one to ten second turn limits with the default warning settings':
+        () {
+          for (final turnLimitSeconds in [1, 5, 9, 10]) {
+            final message = validateSessionSettingsDraft(
+              SessionSettingsDraft.defaults().copyWith(
+                turnLimitSeconds: turnLimitSeconds,
+              ),
+            );
+
+            _expectEquals(message, null);
+          }
+        },
+    'turn warnings are disabled when the turn limit is not after the warning moment':
+        () {
+          final config = SessionSettingsDraft.defaults()
+              .copyWith(turnLimitSeconds: 10)
+              .toSessionConfig();
+
+          _expectEquals(config.alertConfig.warningBeforeSeconds, 10);
+          _expectEquals(config.alertConfig.turnWarningEnabled, false);
+          _expectEquals(config.alertConfig.totalWarningEnabled, true);
+        },
     'validates penalty thresholds that can never be reached': () {
       final message = validateSessionSettingsDraft(
         SessionSettingsDraft.defaults().copyWith(
@@ -120,12 +142,9 @@ void main() {
 
       _expectEquals(message, invalidOvertimeWindowMessage);
     },
-    'validates warning moments that are not before a limit': () {
+    'validates warning moments that are not before the total limit': () {
       final message = validateSessionSettingsDraft(
-        SessionSettingsDraft.defaults().copyWith(
-          turnLimitSeconds: 60,
-          warningBeforeSeconds: 60,
-        ),
+        SessionSettingsDraft.defaults().copyWith(warningBeforeSeconds: 600),
       );
 
       _expectEquals(message, invalidWarningBeforeMessage);

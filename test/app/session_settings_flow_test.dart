@@ -61,6 +61,25 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('v4 setup starts from the 10 second turn preset', (tester) async {
+    final store = JsonAppSettingsStore(storage: InMemoryAppSettingsStorage());
+
+    await tester.pumpWidget(CalmTurnApp(settingsStore: store));
+    await tester.pump();
+    await tester.pump();
+
+    await _tapText(tester, '10초');
+    await _tapText(tester, '시작');
+
+    expect(find.text('알림 시점은 턴 제한과 전체 시간보다 짧아야 해요.'), findsNothing);
+    expect(find.byKey(const ValueKey('clock-left-zone')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('흰칸.*말하는 중')), findsOneWidget);
+    expect(find.text('0:10'), findsOneWidget);
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('first speaker selection uses the configured names', (
     tester,
   ) async {
