@@ -7,6 +7,12 @@ final _pubspecVersionPattern = RegExp(
   multiLine: true,
 );
 
+Set<String> _declaredPermissions(String manifest) {
+  return RegExp(
+    r'<uses-permission\s+[^>]*android:name="([^"]+)"',
+  ).allMatches(manifest).map((match) => match.group(1)!).toSet();
+}
+
 void main() {
   test('Android and web identity use the v4 Korean brand', () {
     final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
@@ -52,6 +58,57 @@ void main() {
     expect(icon, contains('#2D6A64'));
     expect(icon, contains('#D99C2B'));
     expect(launchBackground, contains('@drawable/ic_turn_ring_launcher'));
+  });
+
+  test('release Android manifest excludes v4 out-of-scope permissions', () {
+    final releaseManifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final debugManifest = File(
+      'android/app/src/debug/AndroidManifest.xml',
+    ).readAsStringSync();
+    final profileManifest = File(
+      'android/app/src/profile/AndroidManifest.xml',
+    ).readAsStringSync();
+    final checklist = File(
+      'docs/08_android_launch_checklist.md',
+    ).readAsStringSync();
+    final policyDraft = File(
+      'docs/10_play_policy_drafts.md',
+    ).readAsStringSync();
+    final releasePermissions = _declaredPermissions(releaseManifest);
+    final debugPermissions = _declaredPermissions(debugManifest);
+    final profilePermissions = _declaredPermissions(profileManifest);
+    final forbiddenReleasePermissions = <String>{
+      'android.permission.RECORD_AUDIO',
+      'android.permission.CAMERA',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.READ_CONTACTS',
+      'android.permission.INTERNET',
+    };
+
+    for (final permission in forbiddenReleasePermissions) {
+      expect(
+        releasePermissions,
+        isNot(contains(permission)),
+        reason: '$permission must not be declared in the release/main manifest',
+      );
+    }
+    expect(debugPermissions, contains('android.permission.INTERNET'));
+    expect(profilePermissions, contains('android.permission.INTERNET'));
+    expect(
+      checklist,
+      contains(
+        '자동 검증: `flutter test test/release_identity_test.dart`에서 release/main 매니페스트에 v4 비대상 권한과 `INTERNET`이 없는지, debug/profile 전용 `INTERNET`이 유지되는지 확인한다.',
+      ),
+    );
+    expect(
+      policyDraft,
+      contains(
+        '자동 검증 추가됨: `flutter test test/release_identity_test.dart`가 release AndroidManifest 권한 정책과 debug/profile 전용 `INTERNET` 분리를 확인한다.',
+      ),
+    );
   });
 
   test('Android version metadata is delegated to pubspec version plus build', () {

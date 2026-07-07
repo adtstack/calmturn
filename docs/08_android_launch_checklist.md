@@ -66,8 +66,10 @@ git diff --check
 - [ ] 앱 종료 후 다시 열었을 때 설정과 기록이 기대대로 남아 있다.
 
 ## 7. 개인정보/정책
-- [ ] 마이크, 녹음, 위치, 연락처 권한을 요청하지 않는다.
-- [ ] debug/profile 권한이 release 매니페스트에 섞이지 않는다.
+- [x] release/main AndroidManifest에 마이크, 녹음, 카메라, 위치, 연락처, `INTERNET` 권한이 없다.
+- [x] debug/profile 전용 `INTERNET` 권한이 release/main 매니페스트에 섞이지 않는다.
+  - 자동 검증: `flutter test test/release_identity_test.dart`에서 release/main 매니페스트에 v4 비대상 권한과 `INTERNET`이 없는지, debug/profile 전용 `INTERNET`이 유지되는지 확인한다.
+  - 실제 기기 권한 요청 및 Play Console 최종 표시는 릴리스 후보에서 별도로 확인한다.
 - [x] 공개 개인정보 처리방침 초안을 준비했다: `docs/10_play_policy_drafts.md`
 - [ ] 실제 공개 개인정보 처리방침 URL을 확보한다. 현재값: `TBD`
 - [x] 지원 URL/문의 경로 초안을 준비했다: `docs/10_play_policy_drafts.md`

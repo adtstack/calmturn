@@ -73,7 +73,7 @@
 
 #### 권한
 
-앱은 v4 범위에서 마이크, 녹음, 위치, 연락처 권한을 요청하지 않습니다. 개발/프로파일 빌드에는 Flutter 개발 편의를 위한 권한이 포함될 수 있으나, Google Play에 제출하는 release 빌드는 별도로 확인해야 합니다.
+앱은 v4 범위에서 마이크, 녹음, 카메라, 위치, 연락처 권한을 요청하지 않습니다. 개발/프로파일 빌드에는 Flutter 개발 편의를 위한 `INTERNET` 권한이 포함될 수 있으나, Google Play에 제출하는 release/main AndroidManifest에는 포함하지 않는 것을 자동 검증합니다. 실제 기기 권한 요청 및 Play Console 최종 표시는 릴리스 후보에서 별도로 확인해야 합니다.
 
 #### 삭제
 
@@ -120,8 +120,10 @@
 
 - [ ] 실제 공개 개인정보 처리방침 URL을 결정하고 접속 가능하게 만든다.
 - [ ] 실제 지원 URL 또는 문의 이메일을 결정한다.
-- [ ] release AndroidManifest에 마이크, 녹음, 위치, 연락처 권한이 없는지 확인한다.
-- [ ] debug/profile 전용 `INTERNET` 권한이 release 매니페스트에 섞이지 않았는지 확인한다.
+- [x] release AndroidManifest에 마이크, 녹음, 카메라, 위치, 연락처, `INTERNET` 권한이 없는지 자동 검증한다.
+- [x] debug/profile 전용 `INTERNET` 권한이 release/main 매니페스트에 섞이지 않았는지 자동 검증한다.
+  - 자동 검증 추가됨: `flutter test test/release_identity_test.dart`가 release AndroidManifest 권한 정책과 debug/profile 전용 `INTERNET` 분리를 확인한다.
+  - 실제 기기 권한 요청 및 Play Console 최종 표시는 릴리스 후보에서 별도로 확인한다.
 - [ ] 앱 내부 기록 삭제 UX가 실제 기기에서 동작하는지 확인한다.
 - [ ] Play Console 데이터 보안 화면의 최신 질문 문구에 맞춰 위 초안을 재검토한다.
 - [ ] 개인정보 처리방침 초안을 법률 자문으로 단정하지 않고 운영자/리뷰어 검토를 거친다.
