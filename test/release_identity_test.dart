@@ -168,4 +168,13 @@ void main() {
       expect(entry.value, isNot(contains('턴 프리셋은 1/3/5/10분')));
     }
   });
+
+  test('settings docs describe the current turn-limit input range', () {
+    final settingsDoc = File(
+      'docs/12_settings_and_notifications.md',
+    ).readAsStringSync();
+
+    expect(settingsDoc, contains('턴 제한 직접 입력 범위: 1초부터 60초'));
+    expect(settingsDoc, isNot(contains('턴 제한 직접 입력 범위: 1분부터 60분')));
+  });
 }
