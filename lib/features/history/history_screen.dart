@@ -178,6 +178,33 @@ final class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   bool _isBusy = false;
 
   Future<void> _deleteRecord() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text('기록을 삭제할까요?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('취소'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
     setState(() {
       _isBusy = true;
     });

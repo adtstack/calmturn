@@ -356,6 +356,33 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearRecords() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text('모든 기록을 삭제할까요?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('취소'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
     setState(() {
       _isBusy = true;
       _statusMessage = null;

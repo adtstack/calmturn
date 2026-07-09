@@ -133,6 +133,73 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('history detail asks before deleting a record', (tester) async {
+    final store = JsonSessionRecordStore(
+      storage: InMemorySessionRecordStorage(),
+    );
+    await store.save(
+      _record('delete-me', DateTime.now(), ConversationOutcome.resolved),
+    );
+
+    await tester.pumpWidget(
+      CupertinoApp(home: HistoryScreen(recordStore: store)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(ValueKey('history-day-${_todayIsoDate()}')));
+    await tester.pumpAndSettle();
+    await _tapText(tester, '기록 delete-me');
+
+    await _tapText(tester, '기록 삭제');
+    expect(find.text('기록을 삭제할까요?'), findsOneWidget);
+    expect((await store.load()).single.id, 'delete-me');
+
+    await _tapText(tester, '취소');
+    expect(find.text('기록을 삭제할까요?'), findsNothing);
+    expect((await store.load()).single.id, 'delete-me');
+
+    await _tapText(tester, '기록 삭제');
+    await _tapText(tester, '삭제');
+
+    expect(await store.load(), isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('advanced settings asks before deleting all records', (
+    tester,
+  ) async {
+    final settingsStore = JsonAppSettingsStore(
+      storage: InMemoryAppSettingsStorage(),
+    );
+    final recordStore = JsonSessionRecordStore(
+      storage: InMemorySessionRecordStorage(),
+    );
+    await recordStore.save(
+      _record('first', DateTime(2026, 6, 6, 9), ConversationOutcome.resolved),
+    );
+
+    await _pumpApp(tester, settingsStore, recordStore);
+    await tester.tap(find.byKey(const ValueKey('advanced-settings-button')));
+    await tester.pumpAndSettle();
+
+    await _tapText(tester, '모든 기록 삭제');
+    expect(find.text('모든 기록을 삭제할까요?'), findsOneWidget);
+    expect((await recordStore.load()).single.id, 'first');
+
+    await _tapText(tester, '취소');
+    expect(find.text('모든 기록을 삭제할까요?'), findsNothing);
+    expect((await recordStore.load()).single.id, 'first');
+
+    await _tapText(tester, '모든 기록 삭제');
+    await _tapText(tester, '삭제');
+
+    expect(await recordStore.load(), isEmpty);
+    expect(find.text('모든 기록을 삭제했어요.'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('wrap-up keeps records simple and commits tags from words', (
     tester,
   ) async {
