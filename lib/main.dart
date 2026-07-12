@@ -311,6 +311,10 @@ final class _TimerHomePageState extends State<TimerHomePage> {
 
   void _commit(List<TimerEvent> events) {
     final passedTurnCount = events.whereType<TurnPassedEvent>().length;
+    final turnPassed = passedTurnCount > 0;
+    if (turnPassed) {
+      _stopTicker();
+    }
     final cues = events.isEmpty
         ? _feedbackCues
         : widget.feedbackService.cuesFor(events, widget.config);
@@ -331,6 +335,10 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     });
     if (shouldStop) {
       _stopTicker();
+      return;
+    }
+    if (turnPassed) {
+      _startTickerAfterBuild();
     }
   }
 
@@ -341,7 +349,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       }
       _finishActiveBreak(DateTime.now());
       _commit(_engine.resume());
-      _startTicker();
+      _startTickerAfterBuild();
       return;
     }
 
@@ -357,9 +365,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   void _passTurn() {
     _stopTicker();
     _commit(_engine.passTurn());
-    if (_isRunningPhase) {
-      _startTicker();
-    }
   }
 
   Future<void> _confirmFinish() async {
@@ -431,7 +436,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
       _beginSession();
     });
     _activateTimerDisplay();
-    _startTicker();
+    _startTickerAfterBuild();
   }
 
   void _handleWrapUpComplete() {

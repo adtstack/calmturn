@@ -242,6 +242,46 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('short turn ticker starts after boundary rebuild', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config(bTotalSeconds: 1));
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    final rightZone = find.byKey(const ValueKey('clock-right-zone'));
+
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    await tester.pump(const Duration(milliseconds: 984));
+    final bWasRunningBeforeExpiry =
+        find.bySemanticsLabel(RegExp('B.*말하는 중')).evaluate().length == 1;
+    final turnTimeWasVisibleBeforeExpiry =
+        find.text('0:01').evaluate().length == 1;
+    final pauseBeforeExpiry = tester.widget<CupertinoButton>(
+      find.byKey(const ValueKey('pause-session-button')),
+    );
+    final totalHadEndedBeforeExpiry = pauseBeforeExpiry.onPressed == null;
+
+    await tester.pump(const Duration(milliseconds: 16));
+
+    final pauseAfterExpiry = tester.widget<CupertinoButton>(
+      find.byKey(const ValueKey('pause-session-button')),
+    );
+    expect(pauseAfterExpiry.onPressed, isNull);
+    expect(tester.getSize(leftZone).width, closeTo(1000, 2));
+    expect(rightZone, findsNothing);
+    expect(bWasRunningBeforeExpiry, isTrue);
+    expect(turnTimeWasVisibleBeforeExpiry, isTrue);
+    expect(totalHadEndedBeforeExpiry, isFalse);
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('two rapid passes resync the returning speaker motion', (
     tester,
   ) async {
