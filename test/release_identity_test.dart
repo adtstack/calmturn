@@ -177,4 +177,50 @@ void main() {
     expect(settingsDoc, contains('턴 제한 직접 입력 범위: 1초부터 60초'));
     expect(settingsDoc, isNot(contains('턴 제한 직접 입력 범위: 1분부터 60분')));
   });
+
+  test('v4 docs describe continuous clock boundary motion', () {
+    final docs = <String, String>{
+      for (final path in <String>[
+        'README.md',
+        'docs/00_product_brief.md',
+        'docs/01_prd.md',
+        'docs/02_mvp_scope.md',
+        'docs/03_user_flows.md',
+        'docs/04_screen_specs.md',
+        'docs/08_android_launch_checklist.md',
+        'docs/09_vibe_coding_prompts.md',
+        'docs/10_copy_and_brand.md',
+        'docs/11_time_rules.md',
+      ])
+        path: File(path).readAsStringSync(),
+    };
+
+    for (final entry in docs.entries) {
+      expect(entry.value, contains('경계는 50:50에서 시작한다.'), reason: entry.key);
+      expect(
+        entry.value,
+        contains('턴이 넘어가도 경계는 현재 위치를 유지한다.'),
+        reason: entry.key,
+      );
+      expect(
+        entry.value,
+        contains('새 발언자의 현재 영역은 턴 시간 동안 화면 바깥쪽 끝을 향해 선형으로 줄어든다.'),
+        reason: entry.key,
+      );
+    }
+
+    final combined = docs.values.join('\n');
+    for (final staleRule in <String>[
+      '남은 시간 비율만큼 화면 영역도 줄어든다.',
+      '현재 발언자의 총 남은 시간이 줄어들수록 해당 영역 폭도 줄어든다.',
+      '현재 발언자의 총 남은 시간이 줄면 해당 영역 폭도 줄어든다.',
+      '전체 남은 시간 비율에 따른 영역 폭 변화',
+      '현재 발언자의 영역 폭이 총 남은 시간에 맞춰 줄어든다.',
+      '현재 발언자 총 남은 시간에 따른 영역 폭 변화',
+      '한 사람의 총 시간이 줄어들면 실행 화면의 해당 영역 폭도 줄어든다.',
+      '남편 영역 폭은 총 남은 시간 비율에 맞춰 줄어든다.',
+    ]) {
+      expect(combined, isNot(contains(staleRule)), reason: staleRule);
+    }
+  });
 }
