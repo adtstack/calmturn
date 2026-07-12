@@ -18,8 +18,6 @@ import 'features/timer/domain/timer_models.dart';
 import 'features/timer/timer_display_controller.dart';
 import 'features/timer/timer_feedback.dart';
 
-const _clockBoundaryAnimationDuration = Duration(milliseconds: 700);
-
 void main() {
   platform_storage.configurePlatformAppSettingsStorage();
   runApp(const CalmTurnApp());
@@ -214,8 +212,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   int _totalBreakSeconds = 0;
   DateTime? _breakStartedAt;
   bool _timerDisplayActive = false;
-  int _turnVisualTotalSeconds = 1;
-  int _turnVisualVersion = 0;
+  int _clockSessionVersion = 0;
 
   TimerSnapshot get _snapshot => _engine.snapshot();
 
@@ -291,7 +288,7 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     _breakCount = 0;
     _totalBreakSeconds = 0;
     _breakStartedAt = null;
-    _resetTurnVisualProgress();
+    _clockSessionVersion += 1;
   }
 
   void _activateTimerDisplay() {
@@ -311,10 +308,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 
   void _commit(List<TimerEvent> events) {
-    if (events.any((event) => event is TurnPassedEvent)) {
-      _resetTurnVisualProgress();
-    }
-
     final cues = events.isEmpty
         ? _feedbackCues
         : widget.feedbackService.cuesFor(events, widget.config);
@@ -362,12 +355,6 @@ final class _TimerHomePageState extends State<TimerHomePage> {
     if (_isRunningPhase) {
       _startTicker();
     }
-  }
-
-  void _resetTurnVisualProgress() {
-    final remainingSeconds = _snapshot.currentTurnRemainingSeconds;
-    _turnVisualTotalSeconds = remainingSeconds > 0 ? remainingSeconds : 1;
-    _turnVisualVersion += 1;
   }
 
   Future<void> _confirmFinish() async {
@@ -486,11 +473,10 @@ final class _TimerHomePageState extends State<TimerHomePage> {
         fit: StackFit.expand,
         children: [
           _ClockZoneLayout(
+            key: ValueKey('clock-zone-session-$_clockSessionVersion'),
             participantA: participantA,
             participantB: participantB,
             snapshot: snapshot,
-            turnVisualTotalSeconds: _turnVisualTotalSeconds,
-            turnVisualVersion: _turnVisualVersion,
             turnLimitSeconds: widget.config.turnLimitSeconds,
             turnDangerFlashEnabled:
                 widget.config.alertConfig.turnDangerFlashEnabled,
@@ -532,12 +518,10 @@ final class _TimerHomePageState extends State<TimerHomePage> {
   }
 }
 
-final class _ClockZoneLayout extends StatelessWidget {
+final class _ClockZoneLayout extends StatefulWidget {
   final Participant participantA;
   final Participant participantB;
   final TimerSnapshot snapshot;
-  final int turnVisualTotalSeconds;
-  final int turnVisualVersion;
   final int turnLimitSeconds;
   final bool turnDangerFlashEnabled;
   final bool showOvertime;
@@ -545,11 +529,10 @@ final class _ClockZoneLayout extends StatelessWidget {
   final VoidCallback? onPassTurn;
 
   const _ClockZoneLayout({
+    super.key,
     required this.participantA,
     required this.participantB,
     required this.snapshot,
-    required this.turnVisualTotalSeconds,
-    required this.turnVisualVersion,
     required this.turnLimitSeconds,
     required this.turnDangerFlashEnabled,
     required this.showOvertime,
@@ -558,18 +541,59 @@ final class _ClockZoneLayout extends StatelessWidget {
   });
 
   @override
+  State<_ClockZoneLayout> createState() => _ClockZoneLayoutState();
+}
+
+final class _ClockZoneLayoutState extends State<_ClockZoneLayout>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _boundaryController;
+
+  @override
+  void initState() {
+    super.initState();
+    _boundaryController = AnimationController(
+      vsync: this,
+      lowerBound: 0,
+      upperBound: 1,
+      value: 0.5,
+    );
+    _animateToActiveParticipant();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ClockZoneLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.snapshot.activeParticipantId !=
+        widget.snapshot.activeParticipantId) {
+      _animateToActiveParticipant();
+    }
+  }
+
+  void _animateToActiveParticipant() {
+    final target = widget.snapshot.activeParticipantId == widget.participantA.id
+        ? 0.0
+        : 1.0;
+    _boundaryController.animateTo(
+      target,
+      duration: Duration(seconds: widget.snapshot.currentTurnRemainingSeconds),
+      curve: Curves.linear,
+    );
+  }
+
+  @override
+  void dispose() {
+    _boundaryController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final totalRemainingSeconds =
-        participantA.totalRemainingSeconds + participantB.totalRemainingSeconds;
+        widget.participantA.totalRemainingSeconds +
+        widget.participantB.totalRemainingSeconds;
     if (totalRemainingSeconds <= 0) {
       return const SizedBox.shrink();
     }
-
-    final leftTargetFraction = _currentTurnClockFraction(
-      participantA: participantA,
-      snapshot: snapshot,
-      turnVisualTotalSeconds: turnVisualTotalSeconds,
-    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -578,24 +602,18 @@ final class _ClockZoneLayout extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return TweenAnimationBuilder<double>(
-          key: ValueKey(
-            'clock-boundary-$turnVisualVersion-${snapshot.activeParticipantId}',
-          ),
-          tween: Tween<double>(
-            begin: leftTargetFraction,
-            end: leftTargetFraction,
-          ),
-          duration: _clockBoundaryAnimationDuration,
-          curve: Curves.easeOutCubic,
-          builder: (context, animatedLeftFraction, child) {
-            final leftFraction = animatedLeftFraction.clamp(0.0, 1.0);
+        return AnimatedBuilder(
+          animation: _boundaryController,
+          builder: (context, child) {
+            final leftFraction = _boundaryController.value.clamp(0.0, 1.0);
             final leftWidth = totalWidth * leftFraction;
             final rightWidth = totalWidth - leftWidth;
             final showLeftBackground = _shouldShowClockBackground(leftWidth);
             final showRightBackground = _shouldShowClockBackground(rightWidth);
-            final showLeftReadout = participantA.totalRemainingSeconds > 0;
-            final showRightReadout = participantB.totalRemainingSeconds > 0;
+            final showLeftReadout =
+                widget.participantA.totalRemainingSeconds > 0;
+            final showRightReadout =
+                widget.participantB.totalRemainingSeconds > 0;
 
             return Stack(
               fit: StackFit.expand,
@@ -618,9 +636,9 @@ final class _ClockZoneLayout extends StatelessWidget {
                   ],
                 ),
                 _TurnDangerFlash(
-                  snapshot: snapshot,
-                  turnLimitSeconds: turnLimitSeconds,
-                  enabled: turnDangerFlashEnabled,
+                  snapshot: widget.snapshot,
+                  turnLimitSeconds: widget.turnLimitSeconds,
+                  enabled: widget.turnDangerFlashEnabled,
                 ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -628,23 +646,23 @@ final class _ClockZoneLayout extends StatelessWidget {
                     if (showLeftReadout)
                       Expanded(
                         child: _ClockReadout(
-                          participant: participantA,
-                          snapshot: snapshot,
-                          showOvertime: showOvertime,
-                          canResume: canResume,
+                          participant: widget.participantA,
+                          snapshot: widget.snapshot,
+                          showOvertime: widget.showOvertime,
+                          canResume: widget.canResume,
                           isDark: false,
-                          onPassTurn: onPassTurn,
+                          onPassTurn: widget.onPassTurn,
                         ),
                       ),
                     if (showRightReadout)
                       Expanded(
                         child: _ClockReadout(
-                          participant: participantB,
-                          snapshot: snapshot,
-                          showOvertime: showOvertime,
-                          canResume: canResume,
+                          participant: widget.participantB,
+                          snapshot: widget.snapshot,
+                          showOvertime: widget.showOvertime,
+                          canResume: widget.canResume,
                           isDark: true,
-                          onPassTurn: onPassTurn,
+                          onPassTurn: widget.onPassTurn,
                         ),
                       ),
                   ],
@@ -660,22 +678,6 @@ final class _ClockZoneLayout extends StatelessWidget {
 
 bool _shouldShowClockBackground(double width) {
   return width > 0.5;
-}
-
-double _currentTurnClockFraction({
-  required Participant participantA,
-  required TimerSnapshot snapshot,
-  required int turnVisualTotalSeconds,
-}) {
-  final totalSeconds = turnVisualTotalSeconds > 0 ? turnVisualTotalSeconds : 1;
-  final remainingSeconds = snapshot.phase == TimerPhase.runningOvertime
-      ? 0
-      : snapshot.currentTurnRemainingSeconds.clamp(0, totalSeconds);
-  final activeWidthFraction = 0.5 * (remainingSeconds / totalSeconds);
-  if (snapshot.activeParticipantId == participantA.id) {
-    return activeWidthFraction;
-  }
-  return 1 - activeWidthFraction;
 }
 
 final class _ClockZoneBackground extends StatelessWidget {

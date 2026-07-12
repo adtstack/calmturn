@@ -75,7 +75,6 @@ void main() {
     expect(initialLeftWidth, closeTo(initialRightWidth, 1));
 
     await tester.pump(const Duration(seconds: 30));
-    await tester.pump(const Duration(milliseconds: 800));
 
     expect(tester.getSize(leftZone).width, closeTo(250, 2));
     expect(tester.getSize(rightZone).width, closeTo(750, 2));
@@ -86,7 +85,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('clock boundary follows current turn screen progress', (
+  testWidgets('clock boundary moves linearly throughout the current turn', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 400));
@@ -96,18 +95,19 @@ void main() {
 
     final leftZone = find.byKey(const ValueKey('clock-left-zone'));
     final initialLeftWidth = tester.getSize(leftZone).width;
+    expect(initialLeftWidth, closeTo(500, 1));
 
-    await tester.pump(const Duration(seconds: 30));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 15));
+    final fifteenSecondLeftWidth = tester.getSize(leftZone).width;
+    expect(fifteenSecondLeftWidth, closeTo(375, 2));
 
-    final easingLeftWidth = tester.getSize(leftZone).width;
+    await tester.pump(const Duration(seconds: 15));
+    final thirtySecondLeftWidth = tester.getSize(leftZone).width;
+    expect(thirtySecondLeftWidth, closeTo(250, 2));
 
-    await tester.pump(const Duration(milliseconds: 800));
-
-    final settledLeftWidth = tester.getSize(leftZone).width;
-    expect(easingLeftWidth, lessThan(initialLeftWidth));
-    expect(easingLeftWidth, greaterThan(settledLeftWidth + 40));
-    expect(settledLeftWidth, closeTo(250, 2));
+    final firstTravelDistance = initialLeftWidth - fifteenSecondLeftWidth;
+    final secondTravelDistance = fifteenSecondLeftWidth - thirtySecondLeftWidth;
+    expect(firstTravelDistance, closeTo(secondTravelDistance, 2));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -127,7 +127,6 @@ void main() {
     final initialReadoutWidth = tester.getSize(leftReadout).width;
 
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 800));
 
     final tickedZoneWidth = tester.getSize(leftZone).width;
     final tickedReadoutWidth = tester.getSize(leftReadout).width;
@@ -138,7 +137,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('next speaker starts the background boundary from center', (
+  testWidgets('next speaker continues from the current boundary position', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 400));
@@ -149,23 +148,47 @@ void main() {
     final leftZone = find.byKey(const ValueKey('clock-left-zone'));
 
     await tester.pump(const Duration(seconds: 30));
-    await tester.pump(const Duration(milliseconds: 800));
-    expect(tester.getSize(leftZone).width, closeTo(250, 2));
+    final beforePassWidth = tester.getSize(leftZone).width;
+    expect(beforePassWidth, closeTo(250, 2));
 
     await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
     await tester.pump();
 
     expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
-    expect(tester.getSize(leftZone).width, closeTo(500, 1));
+    expect(tester.getSize(leftZone).width, closeTo(beforePassWidth, 0.5));
 
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(seconds: 30));
 
-    expect(tester.getSize(leftZone).width, greaterThan(507));
+    expect(tester.getSize(leftZone).width, closeTo(625, 2));
 
     await _finishThroughDialog(tester);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'sub-second turn pass preserves the displayed boundary position',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1000, 400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await _pumpTimer(tester, _config());
+
+      final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump(const Duration(milliseconds: 350));
+      final beforePassWidth = tester.getSize(leftZone).width;
+
+      await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
+      await tester.pump();
+
+      expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
+      expect(tester.getSize(leftZone).width, closeTo(beforePassWidth, 0.5));
+
+      await _finishThroughDialog(tester);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('active speaker zone shrinks away when total time reaches zero', (
     tester,
@@ -179,7 +202,6 @@ void main() {
     expect(find.byKey(const ValueKey('clock-right-zone')), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.byKey(const ValueKey('clock-left-zone')), findsNothing);
     final rightZone = find.byKey(const ValueKey('clock-right-zone'));
@@ -358,18 +380,16 @@ void main() {
     await _pumpTimer(tester, _config());
 
     await tester.tap(find.byKey(const ValueKey('pause-session-button')));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.byKey(const ValueKey('resume-session-button')), findsOneWidget);
     expect(find.text('잠깐 멈춤'), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('resume-session-button')));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.byKey(const ValueKey('pause-session-button')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('finish-session-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('종료할까요?'), findsOneWidget);
-    await _tapText(tester, '취소');
+    await _openFinishDialog(tester);
+    await _tapText(tester, '취소', settle: false);
     expect(find.text('종료할까요?'), findsNothing);
 
     await _finishThroughDialog(tester);
@@ -413,19 +433,35 @@ Future<void> _pumpTimer(WidgetTester tester, SessionConfig config) async {
   await tester.pump();
 }
 
-Future<void> _finishThroughDialog(WidgetTester tester) async {
+Future<void> _openFinishDialog(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
   expect(find.text('종료할까요?'), findsOneWidget);
+}
+
+Future<void> _finishThroughDialog(WidgetTester tester) async {
+  await _openFinishDialog(tester);
   await _tapText(tester, '종료');
 }
 
-Future<void> _tapText(WidgetTester tester, String text) async {
+Future<void> _tapText(
+  WidgetTester tester,
+  String text, {
+  bool settle = true,
+}) async {
   final finder = find.text(text).last;
   await tester.ensureVisible(finder);
   await tester.pump();
   await tester.tap(finder);
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    for (var elapsedMilliseconds = 0; elapsedMilliseconds < 600;) {
+      await tester.pump(const Duration(milliseconds: 100));
+      elapsedMilliseconds += 100;
+    }
+  }
 }
 
 List<List<Object?>> _orientationArguments(List<MethodCall> calls) {
