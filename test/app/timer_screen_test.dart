@@ -215,6 +215,61 @@ void main() {
     },
   );
 
+  testWidgets('sub-second manual pass gives the new turn a full boundary run', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    final rightZone = find.byKey(const ValueKey('clock-right-zone'));
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
+    await tester.pump();
+
+    await tester.pump(const Duration(seconds: 59));
+    await tester.pump(const Duration(milliseconds: 650));
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('오버타임 +0:00'), findsOneWidget);
+    expect(tester.getSize(leftZone).width, closeTo(1000, 2));
+    expect(rightZone, findsNothing);
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('two rapid passes resync the returning speaker motion', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+
+    await tester.pump(const Duration(seconds: 10));
+    final widthBeforePasses = tester.getSize(leftZone).width;
+    expect(widthBeforePasses, closeTo(416.67, 2));
+
+    final activeSpeaker = find.bySemanticsLabel(RegExp('A.*말하는 중'));
+    await tester.tap(activeSpeaker);
+    await tester.tap(activeSpeaker);
+    await tester.pump();
+
+    expect(find.bySemanticsLabel(RegExp('A.*말하는 중')), findsOneWidget);
+    expect(tester.getSize(leftZone).width, closeTo(widthBeforePasses, 0.5));
+
+    await tester.pump(const Duration(seconds: 10));
+    expect(tester.getSize(leftZone).width, closeTo(347.22, 2));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('pause freezes the boundary and resumes using remaining time', (
     tester,
   ) async {
