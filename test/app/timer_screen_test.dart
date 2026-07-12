@@ -113,6 +113,31 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'clock boundary keeps real-time speed when animations are disabled',
+    (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      await tester.binding.setSurfaceSize(const Size(1000, 400));
+      addTearDown(() async {
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+        await tester.binding.setSurfaceSize(null);
+      });
+
+      await _pumpTimer(tester, _config());
+
+      final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+      expect(tester.getSize(leftZone).width, closeTo(500, 1));
+
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(tester.getSize(leftZone).width, closeTo(483.33, 2));
+
+      await _finishThroughDialog(tester);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('clock background moves while the readout stays anchored', (
     tester,
   ) async {
@@ -442,7 +467,8 @@ Future<void> _openFinishDialog(WidgetTester tester) async {
 
 Future<void> _finishThroughDialog(WidgetTester tester) async {
   await _openFinishDialog(tester);
-  await _tapText(tester, '종료');
+  await _tapText(tester, '종료', settle: false);
+  expect(find.byKey(const ValueKey('finish-session-button')), findsNothing);
 }
 
 Future<void> _tapText(

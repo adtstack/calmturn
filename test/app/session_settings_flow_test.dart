@@ -49,7 +49,7 @@ void main() {
 
     await _tapText(tester, '20분');
     await _tapText(tester, '1분');
-    await _tapText(tester, '시작');
+    await _tapText(tester, '시작', settleAfterTap: false);
 
     expect(find.text('두 사람이 같은 규칙을 보고 시작해요'), findsNothing);
     expect(find.byKey(const ValueKey('clock-left-zone')), findsOneWidget);
@@ -69,7 +69,7 @@ void main() {
     await tester.pump();
 
     await _tapText(tester, '10초');
-    await _tapText(tester, '시작');
+    await _tapText(tester, '시작', settleAfterTap: false);
 
     expect(find.text('알림 시점은 턴 제한과 전체 시간보다 짧아야 해요.'), findsNothing);
     expect(find.byKey(const ValueKey('clock-left-zone')), findsOneWidget);
@@ -92,7 +92,7 @@ void main() {
     await tester.enterText(find.byType(CupertinoTextField).at(0), '민준');
     await tester.enterText(find.byType(CupertinoTextField).at(1), '서연');
     await _tapText(tester, '서연');
-    await _tapText(tester, '시작');
+    await _tapText(tester, '시작', settleAfterTap: false);
 
     expect(find.bySemanticsLabel(RegExp('서연.*말하는 중')), findsOneWidget);
 
@@ -152,9 +152,18 @@ void main() {
 Future<void> _finishThroughDialog(WidgetTester tester) async {
   await _showControls(tester);
   await tester.tap(find.byKey(const ValueKey('finish-session-button')));
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
   expect(find.text('종료할까요?'), findsOneWidget);
-  await _tapText(tester, '종료');
+  final finishAction = find.text('종료').last;
+  await tester.ensureVisible(finishAction);
+  await tester.pump();
+  await tester.tap(finishAction);
+  for (var elapsedMilliseconds = 0; elapsedMilliseconds < 600;) {
+    await tester.pump(const Duration(milliseconds: 100));
+    elapsedMilliseconds += 100;
+  }
+  expect(find.byKey(const ValueKey('finish-session-button')), findsNothing);
 }
 
 Future<void> _showControls(WidgetTester tester) async {
@@ -168,7 +177,11 @@ Future<void> _showControls(WidgetTester tester) async {
   await tester.pump();
 }
 
-Future<void> _tapText(WidgetTester tester, String text) async {
+Future<void> _tapText(
+  WidgetTester tester,
+  String text, {
+  bool settleAfterTap = true,
+}) async {
   final textFinder = find.text(text);
   if (textFinder.evaluate().isEmpty) {
     await tester.scrollUntilVisible(
@@ -181,7 +194,12 @@ Future<void> _tapText(WidgetTester tester, String text) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
-  await tester.pumpAndSettle();
+  if (settleAfterTap) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
 }
 
 Future<void> _ensureTextVisible(WidgetTester tester, String text) async {

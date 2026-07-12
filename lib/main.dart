@@ -556,6 +556,7 @@ final class _ClockZoneLayoutState extends State<_ClockZoneLayout>
       lowerBound: 0,
       upperBound: 1,
       value: 0.5,
+      animationBehavior: AnimationBehavior.preserve,
     );
     _animateToActiveParticipant();
   }
