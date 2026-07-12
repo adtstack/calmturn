@@ -215,6 +215,178 @@ void main() {
     },
   );
 
+  testWidgets('pause freezes the boundary and resumes using remaining time', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+
+    await tester.pump(const Duration(seconds: 15));
+    final widthBeforePause = tester.getSize(leftZone).width;
+    expect(widthBeforePause, closeTo(375, 2));
+
+    await tester.tap(find.byKey(const ValueKey('pause-session-button')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.getSize(leftZone).width, closeTo(widthBeforePause, 0.5));
+
+    await tester.tap(find.byKey(const ValueKey('resume-session-button')));
+    await tester.pump();
+    expect(tester.getSize(leftZone).width, closeTo(widthBeforePause, 0.5));
+
+    await tester.pump(const Duration(seconds: 10));
+    expect(tester.getSize(leftZone).width, closeTo(291.67, 2));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('auto switch reverses from the reached edge', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(
+      tester,
+      _config(
+        overtimeConfig: const OvertimeConfig(
+          enabled: false,
+          behavior: TurnLimitBehavior.autoSwitch,
+        ),
+      ),
+    );
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    final rightZone = find.byKey(const ValueKey('clock-right-zone'));
+
+    await tester.pump(const Duration(seconds: 60));
+    expect(find.bySemanticsLabel(RegExp('B.*말하는 중')), findsOneWidget);
+    expect(tester.getSize(rightZone).width, closeTo(1000, 2));
+
+    await tester.pump(const Duration(seconds: 30));
+    expect(tester.getSize(leftZone).width, closeTo(500, 2));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('surface resize preserves the boundary fraction', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    await tester.pump(const Duration(seconds: 30));
+    final originalFraction = tester.getSize(leftZone).width / 1000;
+
+    await tester.binding.setSurfaceSize(const Size(500, 400));
+    await tester.pump();
+    final resizedFraction = tester.getSize(leftZone).width / 500;
+
+    expect(resizedFraction, closeTo(originalFraction, 0.002));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('repeated early passes reverse without position resets', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+
+    await tester.pump(const Duration(seconds: 12));
+    final firstPassWidth = tester.getSize(leftZone).width;
+    await tester.tap(find.bySemanticsLabel(RegExp('A.*말하는 중')));
+    await tester.pump();
+    expect(tester.getSize(leftZone).width, closeTo(firstPassWidth, 0.5));
+
+    await tester.pump(const Duration(seconds: 12));
+    final secondPassWidth = tester.getSize(leftZone).width;
+    expect(secondPassWidth, greaterThan(firstPassWidth));
+    await tester.tap(find.bySemanticsLabel(RegExp('B.*말하는 중')));
+    await tester.pump();
+    expect(tester.getSize(leftZone).width, closeTo(secondPassWidth, 0.5));
+
+    await tester.pump(const Duration(seconds: 12));
+    expect(tester.getSize(leftZone).width, lessThan(secondPassWidth));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('auto pause holds the boundary at the reached edge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(
+      tester,
+      _config(
+        overtimeConfig: const OvertimeConfig(
+          enabled: false,
+          behavior: TurnLimitBehavior.autoPause,
+        ),
+      ),
+    );
+    final rightZone = find.byKey(const ValueKey('clock-right-zone'));
+
+    await tester.pump(const Duration(seconds: 60));
+    expect(tester.getSize(rightZone).width, closeTo(1000, 2));
+    await tester.pump(const Duration(seconds: 10));
+    expect(tester.getSize(rightZone).width, closeTo(1000, 2));
+
+    final pauseButton = tester.widget<CupertinoButton>(
+      find.byKey(const ValueKey('pause-session-button')),
+    );
+    expect(pauseButton.onPressed, isNull);
+    expect(find.textContaining('오버타임'), findsNothing);
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('overtime holds the boundary at the reached edge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final rightZone = find.byKey(const ValueKey('clock-right-zone'));
+
+    await tester.pump(const Duration(seconds: 65));
+    expect(find.text('오버타임 +0:05'), findsOneWidget);
+    expect(tester.getSize(rightZone).width, closeTo(1000, 2));
+
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.getSize(rightZone).width, closeTo(1000, 2));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('new session resets the boundary to center', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimer(tester, _config());
+    final leftZone = find.byKey(const ValueKey('clock-left-zone'));
+    await tester.pump(const Duration(seconds: 30));
+    expect(tester.getSize(leftZone).width, closeTo(250, 2));
+
+    await _pumpTimer(tester, _config(aTotalSeconds: 301));
+    expect(tester.getSize(leftZone).width, closeTo(500, 1));
+
+    await _finishThroughDialog(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('active speaker zone shrinks away when total time reaches zero', (
     tester,
   ) async {
@@ -524,6 +696,7 @@ double _dangerFlashOpacity(WidgetTester tester) {
 SessionConfig _config({
   int aTotalSeconds = 300,
   int bTotalSeconds = 300,
+  OvertimeConfig overtimeConfig = const OvertimeConfig(),
   PenaltyConfig penaltyConfig = const PenaltyConfig(),
   AlertConfig alertConfig = const AlertConfig(),
 }) {
@@ -540,7 +713,7 @@ SessionConfig _config({
     ),
     turnLimitSeconds: 60,
     firstSpeakerId: 'a',
-    overtimeConfig: const OvertimeConfig(),
+    overtimeConfig: overtimeConfig,
     penaltyConfig: penaltyConfig,
     alertConfig: alertConfig,
   );

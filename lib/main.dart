@@ -558,25 +558,38 @@ final class _ClockZoneLayoutState extends State<_ClockZoneLayout>
       value: 0.5,
       animationBehavior: AnimationBehavior.preserve,
     );
-    _animateToActiveParticipant();
+    _syncBoundaryMotion();
   }
 
   @override
   void didUpdateWidget(covariant _ClockZoneLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.snapshot.activeParticipantId !=
-        widget.snapshot.activeParticipantId) {
-      _animateToActiveParticipant();
+    final activeParticipantChanged =
+        oldWidget.snapshot.activeParticipantId !=
+        widget.snapshot.activeParticipantId;
+    final phaseChanged = oldWidget.snapshot.phase != widget.snapshot.phase;
+    if (activeParticipantChanged || phaseChanged) {
+      _syncBoundaryMotion();
     }
   }
 
-  void _animateToActiveParticipant() {
+  void _syncBoundaryMotion() {
+    _boundaryController.stop(canceled: false);
+    if (widget.snapshot.phase != TimerPhase.runningNormal) {
+      return;
+    }
+
+    final remainingSeconds = widget.snapshot.currentTurnRemainingSeconds;
+    if (remainingSeconds <= 0) {
+      return;
+    }
+
     final target = widget.snapshot.activeParticipantId == widget.participantA.id
         ? 0.0
         : 1.0;
     _boundaryController.animateTo(
       target,
-      duration: Duration(seconds: widget.snapshot.currentTurnRemainingSeconds),
+      duration: Duration(seconds: remainingSeconds),
       curve: Curves.linear,
     );
   }
